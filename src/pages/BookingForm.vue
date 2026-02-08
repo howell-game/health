@@ -402,14 +402,15 @@ async function submitForm() {
   const token = await user.getIdToken();
 
   try {
-    const response = await fetch("https://api-igfgqw3n3a-uc.a.run.app/api/bookings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify(form)
-    });
+    const API = import.meta.env.VITE_API_BASE_URL
+    const response = await fetch(`${API}/api/bookings`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`
+  },
+  body: JSON.stringify(form)
+})
 
     const result = await response.json();
 

@@ -87,16 +87,17 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getAuth } from 'firebase/auth'
 
-
 const router = useRouter()
 const route = useRoute()
 const auth = getAuth()
 const loading = ref(false)
 const error = ref('')
 const paymentMethod = ref('card')
-const bookingId = route.query.bookingId // 👈 IMPORTANT
+const bookingId = route.query.bookingId
 
-// Example booking data (replace with props / route params later)
+// ✅ ADD THIS LINE
+const API = import.meta.env.VITE_API_BASE_URL
+
 const booking = ref({
   service: 'Home Nursing Care',
   provider: 'Nurse Grace',
@@ -114,7 +115,8 @@ async function pay() {
 
     const token = await user.getIdToken()
 
-    const res = await fetch("https://api-igfgqw3n3a-uc.a.run.app/api/payment/pay", {
+    // ✅ CHANGE ONLY THIS LINE
+    const res = await fetch(`${API}/api/payment/pay`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -128,10 +130,8 @@ async function pay() {
     })
 
     const data = await res.json()
-
     if (!res.ok) throw new Error("Payment init failed")
 
-    // 🔥 Redirect to Flutterwave
     window.location.href = data.paymentLink
 
   } catch (e) {
@@ -140,7 +140,6 @@ async function pay() {
     loading.value = false
   }
 }
-
 </script>
 
 <style scoped>
