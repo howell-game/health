@@ -102,7 +102,7 @@ const booking = ref({
   service: 'Home Nursing Care',
   provider: 'Nurse Grace',
   date: '12 Aug 2026',
-  amount: 25000
+  amount: 50
 })
 
 async function pay() {
