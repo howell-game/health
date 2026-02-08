@@ -15,6 +15,7 @@
 
         <input v-model="form.name" placeholder="Full Name" required />
         <input type="email" v-model="form.email" placeholder="Email Address" required />
+        <input type="password" v-model="form.password" placeholder="Password" required />
         <input v-model="form.phone" placeholder="Phone Number" required />
 
         <select v-model="form.gender">
@@ -24,7 +25,21 @@
         </select>
 
         <input type="date" v-model="form.dob" />
-        <textarea v-model="form.address" placeholder="Residential Address" required></textarea>
+        <label>
+  Residential Address <small v-if="!form.addressVerified" class="warning">
+  as you input your address please select address from the autofill suggestions
+</small>
+  <input
+    id="provider-address-input"
+    v-model="form.address"
+    placeholder="Start typing your home address…"
+    required
+  />
+</label>
+
+
+<div id="provider-map" class="map-preview"></div>
+
       </section>
 
       <!-- 3️⃣ Professional Role -->
@@ -93,9 +108,15 @@
         </label>
 
         <label>
-          Upload Valid ID (Optional)
+          Upload Valid ID 
           <input type="file" accept="image/*,application/pdf"
                  @change="e => form.idDoc = e.target.files[0]" />
+        </label>
+
+        <label>
+          Upload Your Facial Picture
+          <input type="file" accept="image/*"
+                 @change="e => form.passportDoc = e.target.files[0]" />
         </label>
 
         <small>Your documents are reviewed before your account goes live.</small>
@@ -172,9 +193,25 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
+import { getAuth, createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth'
 import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { onMounted } from 'vue'
+
+let map
+let marker
+let autocomplete
+
+function waitForGoogle() {
+  return new Promise(resolve => {
+    const check = setInterval(() => {
+      if (window.google && window.google.maps) {
+        clearInterval(check)
+        resolve()
+      }
+    }, 100)
+  })
+}
 
 const router = useRouter()
 const auth = getAuth()
@@ -200,15 +237,57 @@ const availableServices = computed(() =>
 )
 
 const form = ref({
-  name:'', email:'', phone:'', gender:'', dob:'', address:'',
+  name:'', email:'', phone:'', password:'', gender:'', dob:'',
+  address:'',
+  lat: null,
+  lng: null,
+  addressVerified: false,
   role:'', qualification:'', specialization:'', experience:'',
   services:[], licenseNumber:'', issuingAuthority:'',
-  licenseDoc:null, idDoc:null,
+  licenseDoc:null, idDoc:null, passportDoc:null,
   city:'', coverageArea:'', travel:'',
   days:[], timeSlots:[], emergency:false,
   bankName:'', accountName:'',
   confirm:false, agree:false
 })
+
+onMounted(async () => {
+  await waitForGoogle()
+
+  const input = document.getElementById('provider-address-input')
+
+  input.addEventListener('input', () => {
+    form.value.addressVerified = false
+  })
+
+  autocomplete = new google.maps.places.Autocomplete(input, {
+    fields: ['formatted_address', 'geometry']
+  })
+
+  map = new google.maps.Map(document.getElementById('provider-map'), {
+    center: { lat: 6.5244, lng: 3.3792 }, // Lagos default
+    zoom: 13
+  })
+
+  marker = new google.maps.Marker({ map })
+
+  autocomplete.addListener('place_changed', () => {
+    const place = autocomplete.getPlace()
+    if (!place.geometry) return
+
+    const loc = place.geometry.location
+
+    map.setCenter(loc)
+    marker.setPosition(loc)
+
+    form.value.address = place.formatted_address
+    form.value.lat = loc.lat()
+    form.value.lng = loc.lng()
+    form.value.addressVerified = true
+  })
+})
+
+
 
 async function upload(uid, file, name) {
   if (!file) return null
@@ -217,40 +296,96 @@ async function upload(uid, file, name) {
   return await getDownloadURL(fileRef)
 }
 
+
 async function submitForm() {
   loading.value = true
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, form.value.email, 'TempPass123!')
-    const uid = cred.user.uid
+  error.value = ''
+  
+  // 🚫 BLOCK SUBMISSION IF ADDRESS NOT VERIFIED
+  if (!form.value.addressVerified) {
+    error.value = 'Please select a valid address from the suggestions'
+    loading.value = false
+    return
+  }
 
+  try {
+    // 1️⃣ Create Auth user with REAL password
+    const cred = await createUserWithEmailAndPassword(
+      auth,
+      form.value.email,
+      form.value.password
+    )
+
+    const user = cred.user
+    const uid = user.uid
+
+    // 2️⃣ Send verification email
+    await sendEmailVerification(user)
+
+    // 3️⃣ Upload documents
     const licenseUrl = await upload(uid, form.value.licenseDoc, 'license')
     const idUrl = await upload(uid, form.value.idDoc, 'id')
+    const passportUrl = await upload(uid, form.value.passportDoc, 'passport')
 
+    // 4️⃣ Save user profile
     await setDoc(doc(db, 'users', uid), {
       uid,
       name: form.value.name,
       email: form.value.email,
       phone: form.value.phone,
+      lat: form.value.lat,
+  lng: form.value.lng,
       address: form.value.address,
-      category: 'provider',
+      role: 'provider',
+      emailVerified: false,
       createdAt: serverTimestamp()
     })
 
+    // 5️⃣ Save provider details
     await setDoc(doc(db, 'providers', uid), {
-      ...form.value,
+      uid,
+      name: form.value.name,
+      email: form.value.email,
+      phone: form.value.phone,
+      gender: form.value.gender,
+      dob: form.value.dob,
+      role: form.value.role,
+      qualification: form.value.qualification,
+      specialization: form.value.specialization,
+      experience: form.value.experience,
+      services: form.value.services,
+      licenseNumber: form.value.licenseNumber,
+      issuingAuthority: form.value.issuingAuthority,
       licenseUrl,
       idUrl,
+      passportUrl,
+      address: form.value.address,
+  lat: form.value.lat,
+  lng: form.value.lng,
+      city: form.value.city,
+      coverageArea: form.value.coverageArea,
+      travel: form.value.travel,
+      days: form.value.days,
+      timeSlots: form.value.timeSlots,
+      emergency: form.value.emergency,
+      bankName: form.value.bankName,
+      accountName: form.value.accountName,
       status: 'pending_review',
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+       activeBooking: false,
+  declineCount: 3
     })
 
-    router.push('/dashboard')
+    // 6️⃣ Redirect to email verification notice
+    router.push('/verify-email')
+
   } catch (e) {
     error.value = e.message
   } finally {
     loading.value = false
   }
 }
+
 </script>
 
 <style scoped>
@@ -291,4 +426,17 @@ button {
   border: none;
   border-radius: 8px;
 }
+.map-preview {
+  width: 100%;
+  height: 300px;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.warning {
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
 </style>

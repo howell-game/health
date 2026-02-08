@@ -100,6 +100,8 @@
       <option>Wound Care</option>
       <option>Injection & Drip</option>
       <option>Elderly Care</option>
+      <option>Post Natal Care</option>
+      <option> Home Monitoring</option>
     </select>
   </label>
 
@@ -120,12 +122,14 @@
   <label>
     Expected Duration of Visit
     <select v-model="form.duration" required>
-      <option>1 Hour</option>
-      <option>2–3 Hours</option>
-      <option>Half Day</option>
-      <option>Full Day</option>
-      <option>Ongoing Care</option>
-    </select>
+  <option value="">Select</option>
+  <option>1 Hour</option>
+  <option>2–3 Hours</option>
+  <option>Half Day</option>
+  <option>Full Day</option>
+  <option>Ongoing Care</option>
+</select>
+
   </label>
 </section>
 
@@ -135,9 +139,30 @@
         <h2>Location Details</h2>
 
         <label>
-          Service Address
-          <textarea v-model="form.address" required></textarea>
-        </label>
+  Service Address <small v-if="!form.addressVerified" class="warning">
+  please confirm your address using the map below.  
+      if your address is not correct, use a nearby landmark
+</small>
+  <input
+    id="address-input"
+    v-model="form.address"
+    placeholder="Start typing address…"
+    required
+  />
+</label>
+<button
+  type="button"
+  class="location-btn"
+  @click="useCurrentLocation"
+>
+  📍 Use my current location
+</button>
+
+
+
+<!-- MAP PREVIEW -->
+<div id="map" class="map-preview"></div>
+
 
         <label>
           State
@@ -255,41 +280,200 @@
 
 <script setup>
 import { reactive } from "vue"
+import { auth, db } from "@/firebase"
+import { useRouter } from "vue-router"
+import { onMounted } from "vue"
+import { watch } from "vue"
+
+
+const router = useRouter()
+
+
+let map
+let marker
+let autocomplete
+
+onMounted(() => {
+  const input = document.getElementById("address-input")
+
+
+  autocomplete = new google.maps.places.Autocomplete(input, {
+    fields: ["formatted_address", "geometry"]
+  })
+
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: 6.5244, lng: 3.3792 }, // Lagos
+    zoom: 13
+  })
+
+  marker = new google.maps.Marker({ map })
+
+  autocomplete.addListener("place_changed", () => {
+    const place = autocomplete.getPlace()
+
+    if (!place.geometry) {
+      form.addressVerified = false
+      return
+    }
+
+    const location = place.geometry.location
+
+    map.setCenter(location)
+    marker.setPosition(location)
+
+    form.address = place.formatted_address
+    form.lat = location.lat()
+    form.lng = location.lng()
+
+    // ✅ Verified ONLY via Google
+    form.addressVerified = true
+  })
+})
+
+
 
 const form = reactive({
   clientName: "",
   clientPhone: "",
   clientEmail: "",
   relationship: "",
+
   patientName: "",
   patientAge: "",
-  patientGender: "",
+  patientGender: "Prefer not to say",
+
   healthConcern: "",
   doctorCare: "No",
   doctorInstructions: "",
-  services: [],
+
+  // ✅ ADD THESE
+  careCategory: "",
+  serviceType: "",
+
   careDescription: "",
   duration: "",
+
   address: "",
+  lat: null,
+  lng: null,
+  addressVerified: false,
   state: "",
   accessible: "Yes",
   locationNotes: "",
+
   date: "",
   time: "Morning",
   urgent: "No",
+
   providerGender: "No Preference",
   usedBefore: "No",
   sameProvider: "",
+
   emergencyName: "",
   emergencyPhone: "",
+
   consent: false,
   paymentAgreement: false
 })
 
-function submitForm() {
-  console.log("Booking submitted:", form)
-  alert("Booking request submitted successfully.")
+
+watch(
+  () => form.address,
+  (newVal, oldVal) => {
+    // If user manually edits after verification, invalidate it
+    if (form.addressVerified && newVal !== oldVal) {
+      form.addressVerified = false
+    }
+  }
+)
+
+async function submitForm() {
+  if (!form.addressVerified) {
+    alert("Please select a valid address from the suggestions.");
+    return;
+  }
+
+  const user = auth.currentUser;
+  if (!user) {
+    alert("You must be logged in");
+    return;
+  }
+
+  const token = await user.getIdToken();
+
+  try {
+    const response = await fetch("https://api-igfgqw3n3a-uc.a.run.app/api/bookings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(form)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Booking failed");
+    }
+
+    router.push({
+      name: "Payment",
+      query: { bookingId: result.bookingId }
+    });
+
+  } catch (error) {
+    console.error(error);
+    alert(error.message);
+  }
 }
+
+function useCurrentLocation() {
+  if (!map || !marker) {
+    alert("Map is still loading. Please wait a moment.");
+    return;
+  }
+
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported on this device.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      const location = { lat, lng };
+
+      map.setCenter(location);
+      map.setZoom(16);
+      marker.setPosition(location);
+
+      const geocoder = new google.maps.Geocoder();
+
+      geocoder.geocode({ location }, (results, status) => {
+        if (status === "OK" && results.length) {
+          form.address = results[0].formatted_address;
+          form.lat = lat;
+          form.lng = lng;
+
+          // ✅ VERIFIED via Google
+          form.addressVerified = true;
+        } else {
+          alert("Unable to determine address. Please use a nearby landmark.");
+          form.addressVerified = false;
+        }
+      });
+    },
+    () => {
+      alert("Location permission denied. Please enable location access.");
+    }
+  );
+}
+
+
+
 </script>
 
 <style>
@@ -366,4 +550,32 @@ textarea {
 .submit-btn:hover {
   background: #166534;
 }
+.map-preview {
+  width: 100%;
+  height: 300px;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+.warning {
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+.location-btn {
+  margin-top: 8px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  border: 1px dashed #1e7f43;
+  background: #f0fff6;
+  color: #1e7f43;
+  cursor: pointer;
+}
+
+.location-btn:hover {
+  background: #dcfce7;
+}
+
+
 </style>

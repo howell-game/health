@@ -11,13 +11,13 @@
       <!-- Profile Card -->
       <section class="card">
 
-        <!-- Profile Image -->
+        <!-- Profile Image (READ ONLY) -->
         <div class="photo-section">
-          <img :src="previewImage || form.photo" class="profile-photo" />
-          <label class="upload-btn">
-            Change Photo
-            <input type="file" accept="image/*" @change="onImageChange" hidden />
-          </label>
+          <img
+            v-if="form.passportUrl"
+            :src="form.passportUrl"
+            class="profile-photo"
+          />
         </div>
 
         <!-- Form -->
@@ -25,31 +25,47 @@
 
           <div class="form-group">
             <label>Full Name</label>
-            <input type="text" v-model="form.name" placeholder="Enter full name" />
+            <input type="text" v-model="form.name" required />
           </div>
 
           <div class="form-group">
             <label>Email</label>
-            <input type="email" v-model="form.email" placeholder="Enter email address" />
+            <input type="email" v-model="form.email" required />
           </div>
 
           <div class="form-group">
             <label>Phone Number</label>
-            <input type="tel" v-model="form.phone" placeholder="+234..." />
+            <input type="tel" v-model="form.phone" required />
           </div>
 
           <div class="form-group">
-            <label>Address</label>
-            <textarea
-              v-model="form.address"
-              rows="3"
-              placeholder="Street, City, State"
-            ></textarea>
-          </div>
+  <label>
+    Address
+     <div class="address-note">
+      please confirm your address using the map below.  
+      if your address is not correct, use a nearby landmark
+    </div>
+    <small v-if="!form.addressVerified" class="warning">
+      select address from autocomplete suggestions
+    </small>
+  </label>
+
+  <input
+    id="address-input"
+    v-model="form.address"
+    placeholder="Start typing address…"
+    required
+  />
+</div>
+
+<!-- MAP PREVIEW -->
+<div id="map" class="map-preview"></div>
 
           <!-- Actions -->
           <div class="actions">
-            <button type="submit" class="primary-btn">Save Changes</button>
+            <button type="submit" class="primary-btn">
+              Save Changes
+            </button>
             <button type="button" class="secondary-btn" @click="cancel">
               Cancel
             </button>
@@ -62,45 +78,135 @@
   </div>
 </template>
 
+
 <script setup>
-import { reactive, ref } from "vue"
+import { reactive, onMounted } from "vue"
 import { useRouter } from "vue-router"
+import { getAuth } from "firebase/auth"
+import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore"
 
 const router = useRouter()
+const auth = getAuth()
+const db = getFirestore()
 
-// Mock provider data (replace with Firebase later)
+let map
+let marker
+let autocomplete
+
 const form = reactive({
-  name: "Nurse Amina",
-  email: "amina@example.com",
-  phone: "+234 812 345 6789",
-  address: "12 Health Street, Lagos",
-  photo: "https://i.pravatar.cc/150"
+  name: "",
+  email: "",
+  phone: "",
+  address: "",
+  lat: null,
+  lng: null,
+  addressVerified: false,
+  passportUrl: ""
 })
 
-const previewImage = ref(null)
+/* ================= LOAD DATA ================= */
+onMounted(async () => {
+  const user = auth.currentUser
+  if (!user) return
 
-// Handle image preview
-function onImageChange(e) {
-  const file = e.target.files[0]
-  if (!file) return
+  const providerRef = doc(db, "providers", user.uid)
+  const snap = await getDoc(providerRef)
 
-  previewImage.value = URL.createObjectURL(file)
-  // later: upload to Firebase Storage
+  if (snap.exists()) {
+    const data = snap.data()
+
+    form.name = data.name || ""
+    form.email = data.email || ""
+    form.phone = data.phone || ""
+    form.address = data.address || ""
+    form.lat = data.lat || null
+    form.lng = data.lng || null
+    form.passportUrl = data.passportUrl || ""
+    form.addressVerified = true
+  }
+
+  initGoogleMaps()
+})
+
+/* ================= GOOGLE MAP ================= */
+function initGoogleMaps() {
+  const input = document.getElementById("address-input")
+
+  input.addEventListener("input", () => {
+    form.addressVerified = false
+  })
+
+  autocomplete = new google.maps.places.Autocomplete(input, {
+    fields: ["formatted_address", "geometry"]
+  })
+
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: form.lat
+      ? { lat: form.lat, lng: form.lng }
+      : { lat: 6.5244, lng: 3.3792 },
+    zoom: 13
+  })
+
+  marker = new google.maps.Marker({ map })
+
+  if (form.lat && form.lng) {
+    marker.setPosition({ lat: form.lat, lng: form.lng })
+  }
+
+  autocomplete.addListener("place_changed", () => {
+    const place = autocomplete.getPlace()
+
+    if (!place.geometry) {
+      form.addressVerified = false
+      return
+    }
+
+    const location = place.geometry.location
+
+    map.setCenter(location)
+    marker.setPosition(location)
+
+    form.address = place.formatted_address
+    form.lat = location.lat()
+    form.lng = location.lng()
+    form.addressVerified = true
+  })
 }
 
-// Save profile (frontend only)
-function saveProfile() {
-  console.log("Updated profile:", form)
-  alert("Profile updated successfully ✔️")
+/* ================= SAVE ================= */
+async function saveProfile() {
+  if (!form.addressVerified) {
+    alert("Please select a valid address from suggestions")
+    return
+  }
 
-  // later: save to Firestore
-  router.push("/provider-dashboard")
+  const user = auth.currentUser
+  if (!user) return
+
+  const payload = {
+    name: form.name,
+    email: form.email,
+    phone: form.phone,
+    address: form.address,
+    lat: form.lat,
+    lng: form.lng
+  }
+
+  await Promise.all([
+    updateDoc(doc(db, "users", user.uid), payload),
+    updateDoc(doc(db, "providers", user.uid), payload)
+  ])
+
+  alert("Profile updated successfully ✔️")
+  router.push("/providerdashboard")
 }
 
 function cancel() {
   router.back()
 }
 </script>
+
+
 
 <style scoped>
 /* ===== PAGE ===== */
@@ -176,6 +282,20 @@ function cancel() {
   cursor: pointer;
 }
 
+.map-preview {
+  width: 100%;
+  height: 300px;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.warning {
+  color: #b91c1c;
+  font-size: 0.85rem;
+}
+
+
 /* ===== FORM ===== */
 .form {
   width: 80%;
@@ -249,5 +369,13 @@ function cancel() {
     flex-direction: column;
   }
 }
+.address-note {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #b91c1c;          /* red */
+  font-weight: 500;
+  line-height: 1.3;
+}
+
 
 </style>

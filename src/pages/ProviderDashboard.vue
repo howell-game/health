@@ -8,86 +8,169 @@
         <div class="profile-info">
           <h1>Hello, {{ provider.name }} 👋</h1>
           <p>Rating: {{ averageRating.toFixed(1) }} ⭐ ({{ totalReviews }} reviews)</p>
-          <div class="availability">
-            <span>Status: </span>
-            <button
-              :class="['toggle-btn', provider.isOnline ? 'online' : 'offline']"
-              @click="toggleAvailability"
-            >
-              {{ provider.isOnline ? 'Online' : 'Offline' }}
-            </button>
-          </div>
+         <div class="availability">
+  <span>Status: </span>
+  <span class="provider-status">
+    {{ provider.status || "Not set" }}
+  </span>
+</div>
+
         </div>
       </section>
 
-      <!-- ===== Active / Upcoming Appointments ===== -->
       <section class="appointments-section">
-        <h2>Today's Appointments</h2>
-        <div v-if="upcomingAppointments.length === 0" class="empty">
-          No appointments for today
-        </div>
-        <div class="appointments-row">
-          <div class="card" v-for="(appt, idx) in upcomingAppointments" :key="idx">
-            <h3>{{ appt.clientName }}</h3>
-            <p><strong>Service:</strong> {{ appt.service }}</p>
-            <p><strong>Time:</strong> {{ appt.time }}</p>
-            <p><strong>Address:</strong> {{ appt.address }}</p>
-            <p><strong>Status:</strong> <span :class="statusClass(appt.status)">{{ appt.status }}</span></p>
-            <div class="card-actions">
-              <button class="small-btn">Start Visit</button>
-              <button class="small-btn">Navigate</button>
-              <button class="small-btn">Message Client</button>
-            </div>
-          </div>
-        </div>
-      </section>
+  <h2>Appointment</h2>
 
-      <!-- ===== Booking Requests / New Clients ===== -->
-      <section class="requests-section">
-        <h2>New Booking Requests</h2>
-        <div v-if="newRequests.length === 0" class="empty">No new requests</div>
-        <div class="appointments-row">
-          <div class="card request-card" v-for="(req, idx) in newRequests" :key="idx">
-            <h3>{{ req.clientName }}</h3>
-            <p><strong>Service:</strong> {{ req.service }}</p>
-            <p><strong>Distance:</strong> {{ req.distance }} km</p>
-            <p><strong>ETA:</strong> {{ req.eta }} mins</p>
+  <div v-if="!activeAppointment" class="empty">
+    No active appointment
+  </div>
 
-            <!-- Animated searching bar -->
-            <div class="progress-bar">
-              <div class="progress" :style="{ width: req.matched ? '100%' : progressWidth(req) }"></div>
-            </div>
-            <div class="request-actions" v-if="!req.matched">
-              <button class="small-btn primary" @click="acceptRequest(idx)">Accept</button>
-              <button class="small-btn danger" @click="declineRequest(idx)">Decline</button>
-            </div>
-            <div v-else class="matched">Provider Matched ✅</div>
-          </div>
-        </div>
-      </section>
+  <div v-else class="appointments-row">
+    <div class="card">
+      <h3>{{ activeAppointment.patientName }}</h3>
 
-      <!-- ===== Past Services / History ===== -->
+      <p><strong>Service:</strong> {{ activeAppointment.serviceType }}</p>
+      <p><strong>Time:</strong> {{ activeAppointment.time }}</p>
+      <p><strong>Address:</strong> {{ activeAppointment.address }}</p>
+      <p>
+        <strong>Status:</strong>
+        <span :class="statusClass(activeAppointment.matchingStatus)">
+          {{ activeAppointment.matchingStatus }}
+        </span>
+      </p>
+
+      <div class="card-actions">
+        <a
+          class="small-btn"
+          :href="`tel:${activeAppointment.clientPhone}`"
+        >
+          Call Client
+        </a>
+        <button class="small-btn navigate-btn" @click="navigateToClient">
+  Navigate
+</button>
+
+
+        
+      </div>
+    </div>
+  </div>
+</section>
+
+
+      <!-- ===== Booking Request ===== -->
+<section class="requests-section">
+  <h2>Booking Request</h2>
+
+  <div v-if="!matchedBooking" class="empty">
+    No booking requests
+  </div>
+
+  <div v-else class="horizontal-card">
+    <!-- LEFT -->
+    <div class="left">
+      <h3
+        class="clickable-name"
+        @click="showDetails = !showDetails"
+      >
+        {{ matchedBooking.patientName }}
+      </h3>
+      <span class="service">
+        {{ matchedBooking.serviceType }}
+      </span>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right">
+      <button class="small-btn primary" @click="acceptBooking">
+        Accept
+      </button>
+      <button class="small-btn danger" @click="rejectBooking">
+        Reject
+      </button>
+    </div>
+  </div>
+
+  <!-- DROPDOWN DETAILS -->
+  <div v-if="showDetails && matchedBooking" class="dropdown">
+    <p><strong>Gender:</strong> {{ matchedBooking.patientGender }}</p>
+    <p><strong>Age:</strong> {{ matchedBooking.patientAge }}</p>
+    <p><strong>Health Concern:</strong> {{ matchedBooking.healthConcern }}</p>
+    <p><strong>Description:</strong> {{ matchedBooking.careDescription }}</p>
+    <p><strong>Date:</strong> {{ matchedBooking.date }}</p>
+    <p><strong>Time:</strong> {{ matchedBooking.time }}</p>
+    <p><strong>Duration:</strong> {{ matchedBooking.duration }}</p>
+    <p><strong>Urgent:</strong> {{ matchedBooking.urgent ? "Yes" : "No" }}</p>
+    <p><strong>Distance:</strong> {{ matchedBooking.distanceKm }} km</p>
+    <p><strong>Price:</strong> ₦{{ matchedBooking.price }}</p>
+    <p><strong>Address:</strong> {{ matchedBooking.address }}</p>
+    <p><strong>Client Phone:</strong> {{ matchedBooking.clientPhone }}</p>
+
+    <p v-if="matchedBooking.doctorInstructions">
+      <strong>Doctor Instructions:</strong>
+      {{ matchedBooking.doctorInstructions }}
+    </p>
+  </div>
+</section>
+
+
       <section class="history-section">
-        <h2>Past Services</h2>
-        <div v-if="pastServices.length === 0" class="empty">No past services</div>
-        <div class="appointments-row">
-          <div class="card" v-for="(service, idx) in pastServices" :key="idx">
-            <h3>{{ service.clientName }}</h3>
-            <p><strong>Service:</strong> {{ service.service }}</p>
-            <p><strong>Date:</strong> {{ service.date }}</p>
-            <p><strong>Feedback:</strong> {{ service.review || 'No review yet' }}</p>
-            <p><strong>Rating:</strong> {{ service.rating || 0 }} ⭐</p>
-          </div>
-        </div>
-      </section>
+  <h2>Past Services</h2>
 
-      <!-- ===== Notifications ===== -->
-      <section class="notifications-section">
-        <h2>Notifications</h2>
-        <ul class="notifications-list">
-          <li v-for="(note, idx) in notifications" :key="idx">{{ note }}</li>
-        </ul>
-      </section>
+  <div v-if="pastServices.length === 0" class="empty">
+    No past services
+  </div>
+
+  <ul class="past-list">
+    <li     
+  v-for="service in paginatedPastServices"
+
+      :key="service.id"
+      class="past-item"
+      @click="togglePast(service.id)"
+    >
+      <!-- MAIN ROW -->
+      <div class="past-main">
+        <span class="name">{{ service.patientName }}</span>
+        <span class="service">{{ service.serviceType }}</span>
+      </div>
+
+      <!-- DROPDOWN -->
+      <div
+        v-if="openPastId === service.id"
+        class="past-dropdown"
+      >
+        <p><strong>Date:</strong> {{ service.date }}</p>
+        <p><strong>Time:</strong> {{ service.time }}</p>
+        <p><strong>Patient Name:</strong> {{ service.patientName }}</p>
+        <p><strong>Gender:</strong> {{ service.patientGender }}</p>
+        <p><strong>Service:</strong> {{ service.serviceType }}</p>
+        <p><strong>Address:</strong> {{ service.address }}</p>
+      </div>
+    </li>
+  </ul>
+  <div class="pagination">
+  <button
+    class="small-btn"
+    :disabled="!hasPrevPast"
+    @click="prevPastPage"
+  >
+    Previous
+  </button>
+
+  <button
+    class="small-btn"
+    :disabled="!hasNextPast"
+    @click="nextPastPage"
+  >
+    Next
+  </button>
+</div>
+
+</section>
+
+
+      
 
       <!-- ===== Settings ===== -->
       <section class="settings-section">
@@ -108,96 +191,256 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed } from "vue";
-import { useRouter } from "vue-router";
+import { reactive, ref, computed } from "vue"
+import { useRouter } from "vue-router"
+import { getAuth, onAuthStateChanged } from "firebase/auth"
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
+  serverTimestamp,
+  updateDoc
+} from "firebase/firestore"
+import { db } from "@/firebase"
 
+const router = useRouter()
+const auth = getAuth()
+
+const pastServices = ref([])
+const ratedBookings = computed(() => {
+  return pastServices.value.filter(
+    b => typeof b.rating === "number"
+  )
+})
+
+const openPastId = ref(null)
+
+/* pagination */
+const pastPage = ref(0)
+const pastPageSize = 3
+
+function togglePast(id) {
+  openPastId.value = openPastId.value === id ? null : id
+}
+
+
+/* ===== PROVIDER ===== */
 const provider = reactive({
-  name: "Nurse Amina",
-  photo: "https://i.pravatar.cc/100",
-  isOnline: true,
-});
+  name: "",
+  photo: null,
+  status: ""   // 🔑 comes from providers.status
+})
 
-// Dummy data
-const upcomingAppointments = reactive([
-  {
-    clientName: "John Doe",
-    service: "Wound Care",
-    time: "10:00 AM",
-    address: "123 Main Street",
-    status: "Pending",
-  },
-  {
-    clientName: "Jane Smith",
-    service: "Physiotherapy",
-    time: "2:00 PM",
-    address: "456 Elm Street",
-    status: "Confirmed",
-  },
-]);
 
-const newRequests = reactive([
-  {
-    clientName: "Alice Green",
-    service: "Injection",
-    distance: 5,
-    eta: 15,
-    matched: false,
-    progress: 0,
-  },
-  {
-    clientName: "Bob White",
-    service: "Massage",
-    distance: 2,
-    eta: 10,
-    matched: false,
-    progress: 0,
-  },
-]);
 
-const pastServices = reactive([
-  { clientName: "John Doe", service: "Wound Care", date: "June 10, 2025", rating: 5, review: "Excellent service!" },
-  { clientName: "Jane Smith", service: "Physiotherapy", date: "June 12, 2025", rating: 4, review: "Very professional." },
-]);
+function toggleAvailability() {
+  provider.isOnline = !provider.isOnline
+}
+
+/* ===== MATCHED BOOKING (REAL-TIME) ===== */
+const matchedBooking = ref(null)
+const showDetails = ref(false)
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) return
+
+  /* ===== FETCH LOGGED-IN PROVIDER PROFILE ===== */
+  const providerSnap = await getDoc(doc(db, "providers", user.uid))
+
+if (providerSnap.exists()) {
+  const data = providerSnap.data()
+
+  provider.name = data.name || "Provider"
+  provider.photo = data.passportUrl || provider.photo
+  provider.status = data.status || ""
+}
+
+
+  /* ===== EXISTING MATCHED BOOKING LISTENER ===== */
+  const q = query(
+    collection(db, "bookings"),
+    where("providerId", "==", user.uid),
+    where("matchingStatus", "==", "matched")
+  )
+
+  onSnapshot(q, (snap) => {
+    if (snap.empty) {
+      matchedBooking.value = null
+      return
+    }
+
+    matchedBooking.value = {
+      id: snap.docs[0].id,
+      ...snap.docs[0].data()
+    }
+  })
+  /* ===== ACTIVE APPOINTMENT (LATEST ACCEPTED) ===== */
+const activeQuery = query(
+  collection(db, "bookings"),
+  where("providerId", "==", user.uid),
+  where("matchingStatus", "in", ["accepted", "completed"])
+
+)
+
+/* ===== PAST SERVICES (COMPLETED + SORTED) ===== */
+const pastQuery = query(
+  collection(db, "bookings"),
+  where("providerId", "==", user.uid),
+  where("matchingStatus", "==", "completed")
+)
+
+onSnapshot(pastQuery, (snap) => {
+  const sorted = snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => {
+      if (!a.completedAt || !b.completedAt) return 0
+      return b.completedAt.seconds - a.completedAt.seconds
+    })
+
+  pastServices.value = sorted
+  pastPage.value = 0 // reset page on update
+})
+
+
+onSnapshot(activeQuery, (snap) => {
+  if (snap.empty) {
+    activeAppointment.value = null
+    return
+  }
+
+  // sort manually by acceptedAt (latest first)
+  const sorted = snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => {
+      if (!a.acceptedAt || !b.acceptedAt) return 0
+      return b.acceptedAt.seconds - a.acceptedAt.seconds
+    })
+
+  activeAppointment.value = sorted[0] // 🔑 ONLY ONE
+})
+
+})
+
+const activeAppointment = ref(null)
+
+
+/* ===== ACTIONS ===== */
+async function acceptBooking() {
+  if (!matchedBooking.value) return
+
+  await updateDoc(
+    doc(db, "bookings", matchedBooking.value.id),
+    {
+      matchingStatus: "accepted",
+      acceptedAt: serverTimestamp()
+    }
+  )
+}
+
+async function rejectBooking() {
+  if (!matchedBooking.value) return
+
+  await updateDoc(
+    doc(db, "bookings", matchedBooking.value.id),
+    {
+      matchingStatus: "rejected",
+      providerId: null
+    }
+  )
+
+  await updateDoc(
+    doc(db, "providers", matchedBooking.value.providerId),
+    { activeBooking: false }
+  )
+}
+
 
 const notifications = reactive([
-  "New booking request from Alice Green",
-  "Appointment reminder for John Doe at 10:00 AM",
-  "Message from Jane Smith",
-]);
+  "New booking request received",
+  "Appointment reminder",
+  "Message from client"
+])
 
-const totalReviews = computed(() => pastServices.length);
+const totalReviews = computed(() => ratedBookings.value.length)
+
+
 const averageRating = computed(() => {
-  if (pastServices.length === 0) return 0;
-  return pastServices.reduce((sum, s) => sum + (s.rating || 0), 0) / pastServices.length;
-});
+  if (!ratedBookings.value.length) return 0
 
-// Toggle availability
-function toggleAvailability() {
-  provider.isOnline = !provider.isOnline;
-}
+  const total = ratedBookings.value.reduce(
+    (sum, b) => sum + b.rating,
+    0
+  )
 
-// Accept / decline requests
-function acceptRequest(idx) {
-  newRequests[idx].matched = true;
-  newRequests[idx].progress = 100;
-}
+  return total / ratedBookings.value.length
+})
 
-function declineRequest(idx) {
-  newRequests.splice(idx, 1);
-}
-
-// Animate progress for unmatched requests
-function progressWidth(req) {
-  return req.progress + "%";
-}
 
 function statusClass(status) {
-  if (status === "Pending") return "pending";
-  if (status === "Confirmed") return "confirmed";
-  if (status === "Completed") return "completed";
-  return "";
+  if (status === "Pending") return "pending"
+  if (status === "Confirmed") return "confirmed"
+  if (status === "Completed") return "completed"
+  return ""
 }
+function navigateToClient() {
+  if (!activeAppointment.value) return
+
+  const destination = encodeURIComponent(activeAppointment.value.address)
+
+  if (!navigator.geolocation) {
+    window.open(
+      `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
+      "_blank"
+    )
+    return
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const origin = `${pos.coords.latitude},${pos.coords.longitude}`
+
+      window.open(
+        `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`,
+        "_blank"
+      )
+    },
+    () => {
+      // fallback if permission denied
+      window.open(
+        `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
+        "_blank"
+      )
+    }
+  )
+}
+
+const paginatedPastServices = computed(() => {
+  const start = pastPage.value * pastPageSize
+  return pastServices.value.slice(start, start + pastPageSize)
+})
+
+const hasNextPast = computed(() => {
+  return (pastPage.value + 1) * pastPageSize < pastServices.value.length
+})
+
+const hasPrevPast = computed(() => {
+  return pastPage.value > 0
+})
+
+function nextPastPage() {
+  if (hasNextPast.value) pastPage.value++
+}
+
+function prevPastPage() {
+  if (hasPrevPast.value) pastPage.value--
+}
+
+
 </script>
+
 
 <style scoped>
 /* ===== GENERAL ===== */
@@ -262,21 +505,28 @@ h2 {
   color: black;
 }
 
-/* ===== APPOINTMENTS & REQUEST CARDS ===== */
+/* ===== APPOINTMENTS ROW ===== */
 .appointments-row {
   display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
+  justify-content: center;   /* center the card */
+  margin-bottom: 20px;
 }
 
+/* ===== APPOINTMENT CARD ===== */
 .card {
+  width: 100%;
+  max-width: 420px;          /* 🔑 CONTROL CARD WIDTH */
   background: #ffffff;
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-  flex: 1 1 300px;
-  width: 80px;
 }
+@media (max-width: 768px) {
+  .card {
+    max-width: 100%;
+  }
+}
+
 
 .card h3 {
   margin: 0 0 8px 0;
@@ -390,5 +640,110 @@ h2 {
     text-align: center;
   }
 }
+/* ===== HORIZONTAL BOOKING CARD ===== */
+.horizontal-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  margin-bottom: 10px;
+}
+
+.horizontal-card .left h3 {
+  margin: 0;
+}
+
+.service {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.horizontal-card .right {
+  display: flex;
+  gap: 10px;
+}
+
+/* CLICKABLE NAME */
+.clickable-name {
+  cursor: pointer;
+  color: #166534;
+  text-decoration: underline;
+}
+
+.clickable-name:hover {
+  color: #15803d;
+}
+
+/* DROPDOWN */
+.dropdown {
+  background: #f0fdf4;
+  padding: 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  box-shadow: inset 0 0 0 1px #bbf7d0;
+}
+/* ===== NAVIGATE BUTTON (GREY) ===== */
+.navigate-btn {
+  background: #e5e7eb;      /* light grey */
+  color: #374151;           /* dark grey text */
+}
+
+.navigate-btn:hover {
+  background: #d1d5db;      /* slightly darker on hover */
+}
+
+/* ===== PAST SERVICES LIST ===== */
+.past-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.past-item {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 0;
+  cursor: pointer;
+}
+
+.past-main {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.past-main .service {
+  color: #6b7280;
+}
+
+.past-dropdown {
+  margin-top: 10px;
+  padding: 10px;
+  background: #f9fafb;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.pagination {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.provider-status {
+  font-weight: 600;
+  color: #166534;
+  background: #dcfce7;
+  padding: 4px 10px;
+  border-radius: 12px;
+  margin-left: 6px;
+  font-size: 0.85rem;
+}
+
 
 </style>

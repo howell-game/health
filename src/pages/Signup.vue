@@ -12,6 +12,18 @@
         Full Name
         <input v-model="form.name" required />
       </label>
+      <label>
+  Phone Number
+  <input
+    type="tel"
+    v-model="form.phone"
+    @input="filterNumbers"
+    maxlength="11"
+    placeholder="Enter phone number"
+    required
+  />
+</label>
+
 
       <label>
         Email Address
@@ -32,6 +44,7 @@
 <script setup>
 import { reactive, ref } from "vue"
 import { auth, db } from "@/firebase"
+import { useRouter } from "vue-router"
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification
@@ -39,12 +52,20 @@ import {
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 
 const loading = ref(false)
-
+const router = useRouter()
 const form = reactive({
   name: "",
   email: "",
-  password: ""
+  password: "",
+  phone: ""
 })
+
+function filterNumbers(event) {
+  const input = event.target
+  input.value = input.value.replace(/\D/g, '')  // remove non-digits
+  form.phone = input.value
+}
+
 
 async function signUp() {
   loading.value = true
@@ -64,15 +85,15 @@ async function signUp() {
       name: form.name,
       email: form.email,
       verified: false,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      phone: form.phone
     })
 
     // 3️⃣ Send verification email
     await sendEmailVerification(user)
 
-    alert(
-      "Account created. Please check your email and verify your account before logging in."
-    )
+    // 6️⃣ Redirect to email verification notice
+    router.push('/verify-email')
 
   } catch (err) {
     alert(err.message)

@@ -35,8 +35,11 @@ import { ref } from "vue"
 import { useRouter } from "vue-router"
 import { signInWithEmailAndPassword } from "firebase/auth"
 import { auth } from "@/firebase"
+import { getFirestore, doc, getDoc } from "firebase/firestore"
+
 
 const router = useRouter()
+const db = getFirestore()
 
 const email = ref("")
 const password = ref("")
@@ -48,14 +51,38 @@ async function login() {
   loading.value = true
 
   try {
-    await signInWithEmailAndPassword(auth, email.value, password.value)
-    router.push("/dashboard") // 🔥 redirect after login
+    // 1️⃣ Sign in
+    const cred = await signInWithEmailAndPassword(
+      auth,
+      email.value,
+      password.value
+    )
+
+    const uid = cred.user.uid
+
+    // 2️⃣ Fetch user role from Firestore
+    const userSnap = await getDoc(doc(db, "users", uid))
+
+    if (!userSnap.exists()) {
+      throw new Error("User profile not found")
+    }
+
+    const userData = userSnap.data()
+
+    // 3️⃣ Redirect based on role
+    if (userData.role === "provider") {
+      router.push("/providerdashboard")
+    } else {
+      router.push("/dashboard")
+    }
+
   } catch (err) {
     error.value = "Invalid email or password"
   } finally {
     loading.value = false
   }
 }
+
 </script>
 
 <style>

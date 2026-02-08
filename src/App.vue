@@ -28,14 +28,18 @@
           <router-link to="/about" class="nav-link" @click="closeMenu">About</router-link>
           <router-link to="/policy" class="nav-link" @click="closeMenu">Policy</router-link>
 
-          <router-link
-            v-if="isLoggedIn"
-            to="/dashboard"
-            class="nav-link"
-            @click="closeMenu"
-          >
-            Dashboard
-          </router-link>
+
+          <a
+  v-if="isLoggedIn"
+  href="#"
+  class="nav-link"
+  @click.prevent="goToDashboard"
+>
+  Dashboard
+</a>
+
+
+          
           <router-link
             v-if="isLoggedIn"
             to="/editprovider"
@@ -67,7 +71,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
+import { useRouter } from "vue-router"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/firebase"
 
+const router = useRouter()
 const menuOpen = ref(false)
 const isLoggedIn = ref(false)
 
@@ -85,11 +93,45 @@ onMounted(() => {
     isLoggedIn.value = !!user
   })
 })
-
-function logout() {
-  signOut(auth)
-  closeMenu()
+async function logout() {
+  try {
+    await signOut(auth)   // ✅ wait for sign out
+    closeMenu()
+    router.replace('/')    // ✅ go to landing page
+  } catch (error) {
+    console.error("Logout failed:", error)
+  }
 }
+
+async function goToDashboard() {
+  closeMenu()
+
+  const user = auth.currentUser
+  if (!user) return
+
+  try {
+    const userRef = doc(db, "users", user.uid)
+    const userSnap = await getDoc(userRef)
+
+    if (!userSnap.exists()) {
+      router.push("/dashboard")
+      return
+    }
+
+    const role = userSnap.data().role
+
+    if (role === "provider") {
+      router.push("/providerdashboard")
+    } else {
+      router.push("/dashboard")
+    }
+
+  } catch (err) {
+    console.error("Dashboard redirect failed:", err)
+    router.push("/dashboard")
+  }
+}
+
 </script>
 
 

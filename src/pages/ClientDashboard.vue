@@ -13,13 +13,29 @@
         <button class="action-btn primary" @click="goToBooking">
           ➕ Book New Service
         </button>
-        <button class="action-btn primary">
-          📅 My Appointments
-        </button>
-        <button class="action-btn primary">
+        <button class="action-btn primary" @click="goToContact">
           💬 Contact Support
         </button>
       </section>
+      
+      <!-- Matching Status Bar -->
+<div
+  class="matching-wrapper"
+  v-if="showMatchingBar"
+>
+  <span class="matching-text">
+    {{ matchingText }}
+  </span>
+
+  <div class="matching-line">
+    <div
+      class="matching-progress"
+      :class="matchingClass"
+    ></div>
+  </div>
+</div>
+
+
 
       <!-- Services Row -->
       <section class="services-row">
@@ -35,28 +51,90 @@
             <p><strong>Time:</strong> {{ upcomingAppointment.time }}</p>
             <p>
               <strong>Status:</strong>
-              <span class="status confirmed">{{ upcomingAppointment.status }}</span>
+             <span
+  class="status"
+  :class="{
+    confirmed: upcomingAppointment.matchingStatus === 'accepted',
+    completed: upcomingAppointment.matchingStatus === 'completed'
+  }"
+>
+  {{ bookingStatus(upcomingAppointment) }}
+</span>
+
             </p>
             <div class="appointment-actions">
-              <button class="small-btn">Message Provider</button>
+              <a
+  v-if="upcomingAppointment?.providerPhone"
+  class="small-btn"
+  :href="`tel:${upcomingAppointment.providerPhone}`"
+>
+  📞 Call Provider
+</a>
+
+<span
+  v-else
+  class="small-btn"
+  style="opacity: 0.6; pointer-events: none;"
+>
+  📞 Call Unavailable
+</span>
+
               <button class="small-btn danger">Cancel</button>
             </div>
           </div>
+          <div class="appointment-actions">
+  <button class="small-btn" @click="prevAppointment" :disabled="!hasPrev">
+    ◀ Prev
+  </button>
+
+  <button class="small-btn" @click="nextAppointment" :disabled="!hasNext">
+    Next ▶
+  </button>
+</div>
+
         </div>
 
-        <!-- Past Services -->
-        <div class="card">
-          <h2>Past Services</h2>
-          <ul class="history">
-            <li v-for="(item, index) in pastServices" :key="index">
-              <span>{{ item.service }}</span>
-              <span class="completed">{{ item.completed ? 'Completed' : 'Pending' }}</span>
-              <button v-if="!item.completed" class="small-btn" @click="markComplete(index)">
-                Complete & Rate
-              </button>
-            </li>
-          </ul>
-        </div>
+       <div class="card">
+  <h2>Services</h2>
+
+  <ul class="history">
+    <li
+      v-for="booking in paginatedServices"
+      :key="booking.id"
+      class="service-item"
+    >
+      <div class="service-info">
+        <strong>{{ booking.provider }}</strong>
+        <small>{{ booking.service }}</small>
+      </div>
+
+      <button
+  class="small-btn"
+  :disabled="booking.matchingStatus === 'completed'"
+  @click="openRating(booking)"
+>
+  {{ booking.matchingStatus === 'completed'
+      ? 'Completed'
+      : 'Complete & Rate' }}
+</button>
+
+
+
+
+      
+    </li>
+  </ul>
+
+  <div class="appointment-actions">
+    <button class="small-btn" @click="prevServicePage" :disabled="!hasPrevService">
+      ◀ Prev
+    </button>
+    <button class="small-btn" @click="nextServicePage" :disabled="!hasNextService">
+      Next ▶
+    </button>
+  </div>
+</div>
+
 
       </section>
 
@@ -77,99 +155,238 @@
     </div>
   </div>
 </template>
-
-
 <script setup>
-import { reactive, ref, onMounted } from "vue"
+import { reactive, ref, onMounted, computed } from "vue"
 import { useRouter } from "vue-router"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
-import { doc, getDoc } from "firebase/firestore"
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  updateDoc,
+  serverTimestamp,
+  onSnapshot,
+  orderBy
+} from "firebase/firestore"
 import { db } from "@/firebase"
 
 const router = useRouter()
+const auth = getAuth()
 
+/* ================= STATE ================= */
+const acceptedBookings = ref([])
+const currentPage = ref(0)
+const matchingStatus = ref(null)
+
+const upcomingAppointment = computed(() => {
+  return acceptedBookings.value[currentPage.value] || null
+})
+
+const hasNext = computed(() => {
+  return currentPage.value < acceptedBookings.value.length - 1
+})
+
+const hasPrev = computed(() => {
+  return currentPage.value > 0
+})
+
+function nextAppointment() {
+  if (hasNext.value) currentPage.value++
+}
+
+function prevAppointment() {
+  if (hasPrev.value) currentPage.value--
+}
+
+/* ================= USER PROFILE ================= */
 const user = reactive({
   name: "",
   email: "",
   phone: ""
 })
 
+/* ================= MATCHING BAR ================= */
+const showMatchingBar = computed(() => {
+  return ["matching", "matched", "accepted"].includes(matchingStatus.value)
+})
+
+const matchingText = computed(() => {
+  if (matchingStatus.value === "matching")
+    return "Matching provider in progress…"
+  if (matchingStatus.value === "matched")
+    return "Provider matched. Awaiting acceptance…"
+  if (matchingStatus.value === "accepted")
+    return "Provider accepted your booking"
+  return ""
+})
+
+const matchingClass = computed(() => ({
+  matching: matchingStatus.value === "matching",
+  matched: matchingStatus.value === "matched",
+  accepted: matchingStatus.value === "accepted"
+}))
+
+/* ================= AUTH + FIRESTORE ================= */
 onMounted(() => {
-  const auth = getAuth()
-
-  // Listen for auth state
   onAuthStateChanged(auth, async (currentUser) => {
-    if (!currentUser) {
-      console.log("User not logged in")
-      return
+    if (!currentUser) return
+
+    /* ---- Fetch user profile ---- */
+    const userSnap = await getDoc(doc(db, "users", currentUser.uid))
+    if (userSnap.exists()) {
+      Object.assign(user, userSnap.data())
     }
 
-    try {
-      const docRef = doc(db, "users", currentUser.uid)
-      const docSnap = await getDoc(docRef)
+    /* ---- Listen for ALL user bookings (status bar) ---- */
+    const statusQuery = query(
+      collection(db, "bookings"),
+      where("userId", "==", currentUser.uid)
+    )
 
-      if (docSnap.exists()) {
-        const data = docSnap.data()
-        user.name = data.name || ""
-        user.email = data.email || ""
-        user.phone = data.phone || ""
-      } else {
-        console.log("No such user document!")
+    onSnapshot(statusQuery, (snapshot) => {
+      if (snapshot.empty) return
+      const latest = snapshot.docs[snapshot.docs.length - 1].data()
+      matchingStatus.value = latest.matchingStatus || null
+    })
+
+    /* ---- Listen for ACCEPTED bookings (appointments card) ---- */
+    const acceptedQuery = query(
+      collection(db, "bookings"),
+      where("userId", "==", currentUser.uid),
+      where("matchingStatus", "in", ["accepted", "completed"]),
+      orderBy("acceptedAt", "desc")
+    )
+
+    onSnapshot(acceptedQuery, async (snapshot) => {
+      const results = []
+
+      for (const docSnap of snapshot.docs) {
+        const booking = docSnap.data()
+
+        let providerName = "Provider"
+        let providerPhone = null
+
+        if (booking.providerId) {
+          const providerSnap = await getDoc(
+            doc(db, "users", booking.providerId)
+          )
+          if (providerSnap.exists()) {
+            providerName = providerSnap.data().name
+            providerPhone = providerSnap.data().phone
+          }
+        }
+
+        results.push({
+          id: docSnap.id,
+          service: booking.serviceType,
+          provider: providerName,
+          providerPhone,
+          date: booking.date,
+          providerId: booking.providerId,
+          time: booking.time,
+          matchingStatus: booking.matchingStatus 
+        })
       }
-    } catch (err) {
-      console.error("Error fetching user:", err)
-    }
+
+      acceptedBookings.value = results
+      currentPage.value = 0
+    })
   })
 })
 
+const servicePage = ref(0)
+const pageSize = 3
 
-
-const upcomingAppointment = reactive({
-  service: "Wound Care",
-  provider: "Nurse Amina",
-  date: "June 20, 2025",
-  time: "10:00 AM",
-  status: "Confirmed"
+const paginatedServices = computed(() => {
+  const start = servicePage.value * pageSize
+  return acceptedBookings.value.slice(start, start + pageSize)
 })
 
-// Rating modal state
+const hasNextService = computed(() => {
+  return (servicePage.value + 1) * pageSize < acceptedBookings.value.length
+})
+
+const hasPrevService = computed(() => {
+  return servicePage.value > 0
+})
+
+function nextServicePage() {
+  if (hasNextService.value) servicePage.value++
+}
+
+function prevServicePage() {
+  if (hasPrevService.value) servicePage.value--
+}
+
 const showRating = ref(false)
 const rating = ref(0)
 const reviewText = ref("")
-const ratingProvider = ref("")
-let currentIndex = null
+const selectedBooking = ref(null)
 
-function goToBooking() {
-  router.push("/book")
-}
-
-function markComplete(index) {
-  currentIndex = index
-  ratingProvider.value = pastServices[index].provider
+function openRating(booking) {
+  selectedBooking.value = booking
+  rating.value = 0
+  reviewText.value = ""
   showRating.value = true
 }
 
 function closeModal() {
   showRating.value = false
-  rating.value = 0
-  reviewText.value = ""
 }
 
-function submitReview() {
-  if (currentIndex !== null) {
-    pastServices[currentIndex].completed = true
-    pastServices[currentIndex].rating = rating.value
-    pastServices[currentIndex].review = reviewText.value
+async function submitReview() {
+  if (!selectedBooking.value) return
+  if (rating.value < 1 || rating.value > 5) return
+
+  try {
+    const bookingId = selectedBooking.value.id
+    const providerId = selectedBooking.value.providerId
+
+    /* 1️⃣ Update booking */
+    await updateDoc(doc(db, "bookings", bookingId), {
+      rating: rating.value,
+      review: reviewText.value.trim(),
+      matchingStatus: "completed",
+      completedAt: serverTimestamp()
+    })
+
+    /* 2️⃣ Update provider (docId === uid) */
+    await updateDoc(doc(db, "providers", providerId), {
+      activeBooking: false
+    })
+
+    /* 3️⃣ Update frontend state ONLY */
+    selectedBooking.value.status = "Completed"
+    selectedBooking.value.completed = true
+
+    /* 4️⃣ Close modal */
+    showRating.value = false
+    rating.value = 0
+    reviewText.value = ""
+    selectedBooking.value = null
+
+  } catch (error) {
+    console.error("Submit review failed:", error)
   }
-  closeModal()
+}
+function bookingStatus(booking) {
+  if (booking.matchingStatus === "accepted") return "In Progress"
+  if (booking.matchingStatus === "completed") return "Completed"
+  return "Pending"
+}
+function goToBooking() {
+  router.push("/book")
+}
+function goToContact() {
+  router.push("/contact")
 }
 
-const pastServices = reactive([
-  { service: "Injection & Drip" },
-  { service: "Elderly Care" }
-])
 
 </script>
+
+
 
 <style scoped>
 /* ===== PAGE ===== */
@@ -323,6 +540,24 @@ const pastServices = reactive([
   border-bottom: none;
 }
 
+.service-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.service-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.service-info small {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+
 .completed {
   color: #166534;
   font-weight: 600;
@@ -397,4 +632,77 @@ const pastServices = reactive([
 .modal button:hover {
   transform: translateY(-2px);
 }
+/* ===== MATCHING STATUS ===== */
+.matching-wrapper {
+  margin-bottom: 14px;
+}
+
+.matching-text {
+  font-size: 0.85rem;
+  color: #6b7280;
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* Base line */
+.matching-line {
+  width: 100%;
+  height: 4px;
+  background: #fef3c7;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Base progress */
+.matching-progress {
+  height: 100%;
+}
+
+/* 🟡 MATCHING (animated) */
+.matching-progress.matching {
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    #fbbf24,
+    #fde68a,
+    #fbbf24
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* 🟡 MATCHED (solid yellow) */
+.matching-progress.matched {
+  width: 100%;
+  background: #fbbf24;
+  animation: none;
+}
+
+/* 🟢 ACCEPTED (green) */
+.matching-progress.accepted {
+  width: 100%;
+  background: #22c55e;
+  animation: none;
+}
+
+/* Animation */
+@keyframes shimmer {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: -200% 0%;
+  }
+}
+.small-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.dashboard {
+  width: 100%;
+  overflow-x: hidden;
+}
+
 </style>

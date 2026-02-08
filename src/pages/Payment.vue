@@ -84,12 +84,17 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
+import { getAuth } from 'firebase/auth'
+
 
 const router = useRouter()
+const route = useRoute()
+const auth = getAuth()
 const loading = ref(false)
 const error = ref('')
 const paymentMethod = ref('card')
+const bookingId = route.query.bookingId // 👈 IMPORTANT
 
 // Example booking data (replace with props / route params later)
 const booking = ref({
@@ -104,19 +109,38 @@ async function pay() {
   error.value = ''
 
   try {
-    // 🔜 Later:
-    // - Call Paystack / Flutterwave / Stripe here
-    // - Save payment record to Firestore
+    const user = auth.currentUser
+    if (!user) throw new Error("Not authenticated")
 
-    await new Promise(r => setTimeout(r, 1500))
+    const token = await user.getIdToken()
 
-    router.push('/payment-success')
+    const res = await fetch("https://api-igfgqw3n3a-uc.a.run.app/api/payment/pay", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        bookingId,
+        amount: booking.value.amount,
+        email: user.email
+      })
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) throw new Error("Payment init failed")
+
+    // 🔥 Redirect to Flutterwave
+    window.location.href = data.paymentLink
+
   } catch (e) {
-    error.value = 'Payment failed. Please try again.'
+    error.value = e.message
   } finally {
     loading.value = false
   }
 }
+
 </script>
 
 <style scoped>
