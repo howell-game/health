@@ -2,12 +2,12 @@
   <div class="success-wrapper">
     <div class="card">
       <div class="icon">
-        ✓
+        X
       </div>
 
-      <h1>Payment Successful</h1>
+      <h1>Payment Failed</h1>
       <p class="subtitle">
-        Thank you for your payment. Your booking has been confirmed.
+        Your booking failed. Please try again!
       </p>
 
       <div class="details">
@@ -16,27 +16,20 @@
           <strong>{{ bookingId }}</strong>
         </div>
         <div class="row">
-          <span>Amount Paid</span>
+          <span>Amount</span>
           <strong>₦{{ amount }}</strong>
         </div>
         <div class="row">
           <span>Status</span>
-          <strong class="status">Confirmed</strong>
+          <strong class="status">Failed</strong>
         </div>
       </div>
 
-      <div class="info-box">
-        <h3>What happens next?</h3>
-        <ul>
-          <li>✔ We are matching you with a qualified provider</li>
-          <li>✔ You will be notified once a provider accepts</li>
-          <li>✔ You can track this booking from your dashboard</li>
-        </ul>
-      </div>
+      
 
       <div class="actions">
         <button class="primary" @click="goToBookings">
-          View My Bookings
+          Book Again
         </button>
         <button class="secondary" @click="goHome">
           Go Home
@@ -57,7 +50,7 @@ const bookingId = route.query.bookingId || "—"
 const amount = route.query.amount || "0.00"
 
 function goToBookings() {
-  router.push("/dashboard")
+  router.push("/book")
 }
 
 function goHome() {
@@ -90,7 +83,7 @@ function goHome() {
   width: 64px;
   height: 64px;
   margin: 0 auto 16px;
-  background: #22c55e;
+  background: #d61616;
   color: white;
   font-size: 32px;
   font-weight: bold;
@@ -125,7 +118,7 @@ h1 {
 }
 
 .status {
-  color: #16a34a;
+  color: #e1403b;
 }
 
 .info-box {

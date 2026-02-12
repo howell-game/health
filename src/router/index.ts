@@ -14,6 +14,8 @@ import ProviderSignup from '@/pages/ProviderSignup.vue'
 import Manage from '@/pages/Manage.vue'
 import Contact from '@/pages/Contact.vue'
 import PaymentSuccess from '@/pages/PaymentSuccess.vue'
+import PaymentFailure from '@/pages/PaymentFailure.vue'
+import PaymentProcessing from '@/pages/PaymentProcessing.vue'
 import VerifyEmail from '@/pages/VerifyEmail.vue'
 
 const router = createRouter({
@@ -23,6 +25,8 @@ const router = createRouter({
     { path: '/', name: 'Landing', component: Landing },
     { path: '/editprovider', name: 'EditProviderProfile', component: EditProviderProfile },
     { path: '/payment-success', name: 'PaymentSuccess', component: PaymentSuccess },
+    { path: '/payment-failure', name: 'PaymentFailure', component: PaymentFailure },
+    { path: '/payment-processing', name: 'PaymentProcessing', component: PaymentProcessing },
     { path: '/verify-email', name: 'VerifyEmail', component: VerifyEmail },
     { path: '/payment', name: 'Payment', component: Payment },
     { path: '/contact', name: 'Contact', component: Contact },
