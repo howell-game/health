@@ -18,20 +18,11 @@
         </button>
       </section>
       
-      <!-- Matching Status Bar -->
-<div
-  class="matching-wrapper"
-  v-if="showMatchingBar"
->
-  <span class="matching-text">
-    {{ matchingText }}
-  </span>
-
+     <!-- Matching Status Bar -->
+<div class="matching-wrapper" v-if="showMatchingBar">
+  <span class="matching-text">{{ matchingText }}</span>
   <div class="matching-line">
-    <div
-      class="matching-progress"
-      :class="matchingClass"
-    ></div>
+    <div class="matching-progress" :class="matchingClass"></div>
   </div>
 </div>
 
@@ -168,7 +159,8 @@ import {
   updateDoc,
   serverTimestamp,
   onSnapshot,
-  orderBy
+  orderBy,
+  limit
 } from "firebase/firestore"
 import { db } from "@/firebase"
 
@@ -178,52 +170,28 @@ const auth = getAuth()
 /* ================= STATE ================= */
 const acceptedBookings = ref([])
 const currentPage = ref(0)
-const matchingStatus = ref(null)
+const matchingStatus = ref(null) // only declare once
 
 const upcomingAppointment = computed(() => {
   return acceptedBookings.value[currentPage.value] || null
 })
 
-const hasNext = computed(() => {
-  return currentPage.value < acceptedBookings.value.length - 1
-})
-
-const hasPrev = computed(() => {
-  return currentPage.value > 0
-})
-
-function nextAppointment() {
-  if (hasNext.value) currentPage.value++
-}
-
-function prevAppointment() {
-  if (hasPrev.value) currentPage.value--
-}
+const hasNext = computed(() => currentPage.value < acceptedBookings.value.length - 1)
+const hasPrev = computed(() => currentPage.value > 0)
+function nextAppointment() { if (hasNext.value) currentPage.value++ }
+function prevAppointment() { if (hasPrev.value) currentPage.value-- }
 
 /* ================= USER PROFILE ================= */
-const user = reactive({
-  name: "",
-  email: "",
-  phone: ""
-})
+const user = reactive({ name: "", email: "", phone: "" })
 
 /* ================= MATCHING BAR ================= */
-const showMatchingBar = computed(() => {
-  return ["matching", "matched", "accepted"].includes(matchingStatus.value)
-})
-
+const showMatchingBar = computed(() => ["matched", "accepted"].includes(matchingStatus.value))
 const matchingText = computed(() => {
-  if (matchingStatus.value === "matching")
-    return "Matching provider in progress…"
-  if (matchingStatus.value === "matched")
-    return "Provider matched. Awaiting acceptance…"
-  if (matchingStatus.value === "accepted")
-    return "Provider accepted your booking"
+  if (matchingStatus.value === "matched") return "Provider matched. Awaiting acceptance…"
+  if (matchingStatus.value === "accepted") return "Provider accepted your booking"
   return ""
 })
-
 const matchingClass = computed(() => ({
-  matching: matchingStatus.value === "matching",
   matched: matchingStatus.value === "matched",
   accepted: matchingStatus.value === "accepted"
 }))
@@ -235,20 +203,22 @@ onMounted(() => {
 
     /* ---- Fetch user profile ---- */
     const userSnap = await getDoc(doc(db, "users", currentUser.uid))
-    if (userSnap.exists()) {
-      Object.assign(user, userSnap.data())
-    }
+    if (userSnap.exists()) Object.assign(user, userSnap.data())
 
-    /* ---- Listen for ALL user bookings (status bar) ---- */
+    /* ---- Listen for latest booking for this user (matching bar) ---- */
     const statusQuery = query(
       collection(db, "bookings"),
-      where("userId", "==", currentUser.uid)
+      where("userId", "==", currentUser.uid),
+      orderBy("createdAt", "desc"),
+      limit(1)
     )
-
     onSnapshot(statusQuery, (snapshot) => {
-      if (snapshot.empty) return
-      const latest = snapshot.docs[snapshot.docs.length - 1].data()
-      matchingStatus.value = latest.matchingStatus || null
+      if (snapshot.empty) {
+        matchingStatus.value = null
+        return
+      }
+      const latestBooking = snapshot.docs[0].data()
+      matchingStatus.value = latestBooking.matchingStatus || null
     })
 
     /* ---- Listen for ACCEPTED bookings (appointments card) ---- */
@@ -258,7 +228,6 @@ onMounted(() => {
       where("matchingStatus", "in", ["accepted", "completed"]),
       orderBy("acceptedAt", "desc")
     )
-
     onSnapshot(acceptedQuery, async (snapshot) => {
       const results = []
 
@@ -269,9 +238,7 @@ onMounted(() => {
         let providerPhone = null
 
         if (booking.providerId) {
-          const providerSnap = await getDoc(
-            doc(db, "users", booking.providerId)
-          )
+          const providerSnap = await getDoc(doc(db, "users", booking.providerId))
           if (providerSnap.exists()) {
             providerName = providerSnap.data().name
             providerPhone = providerSnap.data().phone
@@ -286,7 +253,7 @@ onMounted(() => {
           date: booking.date,
           providerId: booking.providerId,
           time: booking.time,
-          matchingStatus: booking.matchingStatus 
+          matchingStatus: booking.matchingStatus
         })
       }
 
@@ -296,93 +263,66 @@ onMounted(() => {
   })
 })
 
+/* ================= SERVICE PAGINATION ================= */
 const servicePage = ref(0)
 const pageSize = 3
-
 const paginatedServices = computed(() => {
   const start = servicePage.value * pageSize
   return acceptedBookings.value.slice(start, start + pageSize)
 })
+const hasNextService = computed(() => (servicePage.value + 1) * pageSize < acceptedBookings.value.length)
+const hasPrevService = computed(() => servicePage.value > 0)
+function nextServicePage() { if (hasNextService.value) servicePage.value++ }
+function prevServicePage() { if (hasPrevService.value) servicePage.value-- }
 
-const hasNextService = computed(() => {
-  return (servicePage.value + 1) * pageSize < acceptedBookings.value.length
-})
-
-const hasPrevService = computed(() => {
-  return servicePage.value > 0
-})
-
-function nextServicePage() {
-  if (hasNextService.value) servicePage.value++
-}
-
-function prevServicePage() {
-  if (hasPrevService.value) servicePage.value--
-}
-
+/* ================= RATING MODAL ================= */
 const showRating = ref(false)
 const rating = ref(0)
 const reviewText = ref("")
 const selectedBooking = ref(null)
-
 function openRating(booking) {
   selectedBooking.value = booking
   rating.value = 0
   reviewText.value = ""
   showRating.value = true
 }
-
-function closeModal() {
-  showRating.value = false
-}
+function closeModal() { showRating.value = false }
 
 async function submitReview() {
   if (!selectedBooking.value) return
   if (rating.value < 1 || rating.value > 5) return
-
   try {
     const bookingId = selectedBooking.value.id
     const providerId = selectedBooking.value.providerId
 
-    /* 1️⃣ Update booking */
     await updateDoc(doc(db, "bookings", bookingId), {
       rating: rating.value,
       review: reviewText.value.trim(),
       matchingStatus: "completed",
       completedAt: serverTimestamp()
     })
+    await updateDoc(doc(db, "providers", providerId), { activeBooking: false })
 
-    /* 2️⃣ Update provider (docId === uid) */
-    await updateDoc(doc(db, "providers", providerId), {
-      activeBooking: false
-    })
-
-    /* 3️⃣ Update frontend state ONLY */
     selectedBooking.value.status = "Completed"
     selectedBooking.value.completed = true
 
-    /* 4️⃣ Close modal */
     showRating.value = false
     rating.value = 0
     reviewText.value = ""
     selectedBooking.value = null
-
   } catch (error) {
     console.error("Submit review failed:", error)
   }
 }
+
+/* ================= OTHER UTILS ================= */
 function bookingStatus(booking) {
   if (booking.matchingStatus === "accepted") return "In Progress"
   if (booking.matchingStatus === "completed") return "Completed"
   return "Pending"
 }
-function goToBooking() {
-  router.push("/book")
-}
-function goToContact() {
-  router.push("/contact")
-}
-
+function goToBooking() { router.push("/book") }
+function goToContact() { router.push("/contact") }
 
 </script>
 
@@ -656,53 +596,36 @@ function goToContact() {
 /* Base progress */
 .matching-progress {
   height: 100%;
+  border-radius: 10px;
 }
 
-/* 🟡 MATCHING (animated) */
-.matching-progress.matching {
-  width: 40%;
-  background: linear-gradient(
-    90deg,
-    #fbbf24,
-    #fde68a,
-    #fbbf24
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s linear infinite;
-}
-
-/* 🟡 MATCHED (solid yellow) */
+/* 🟡 MATCHED (animated shimmer) */
 .matching-progress.matched {
   width: 100%;
-  background: #fbbf24;
-  animation: none;
+  background: linear-gradient(
+    90deg,
+    #fbbf24 25%,
+    #fde68a 50%,
+    #fbbf24 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
 }
 
-/* 🟢 ACCEPTED (green) */
+/* 🟢 ACCEPTED (solid green) */
 .matching-progress.accepted {
   width: 100%;
   background: #22c55e;
   animation: none;
 }
 
-/* Animation */
+/* Animation keyframes */
 @keyframes shimmer {
-  from {
-    background-position: 0% 0%;
+  0% {
+    background-position: -200% 0;
   }
-  to {
-    background-position: -200% 0%;
+  100% {
+    background-position: 200% 0;
   }
 }
-.small-btn {
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.dashboard {
-  width: 100%;
-  overflow-x: hidden;
-}
-
 </style>

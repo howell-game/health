@@ -192,6 +192,7 @@
 
 <script setup>
 import { reactive, ref, computed } from "vue"
+import { increment } from "firebase/firestore"
 import { useRouter } from "vue-router"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import {
@@ -343,18 +344,36 @@ async function acceptBooking() {
 async function rejectBooking() {
   if (!matchedBooking.value) return
 
+  const providerId = matchedBooking.value.providerId
+  const bookingId = matchedBooking.value.id
+
+  /* 1️⃣ Update booking */
   await updateDoc(
-    doc(db, "bookings", matchedBooking.value.id),
+    doc(db, "bookings", bookingId),
     {
       matchingStatus: "rejected",
       providerId: null
     }
   )
 
+  /* 2️⃣ Update provider: inactive + increment declineCount */
   await updateDoc(
-    doc(db, "providers", matchedBooking.value.providerId),
-    { activeBooking: false }
+    doc(db, "providers", providerId),
+    {
+      activeBooking: false,
+      declineCount: increment(1)
+    }
   )
+
+  /* 3️⃣ Re-trigger matching (exclude this provider) */
+  await fetch("https://api-igfgqw3n3a-uc.a.run.app/api/match/internal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      bookingId,
+      excludeProviderId: providerId
+    })
+  })
 }
 
 
