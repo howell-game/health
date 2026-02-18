@@ -31,45 +31,9 @@
         </div>
       </section>
 
-      <!-- Payment Method -->
-      <section>
-        <h3>Payment Method</h3>
+     
 
-        <label class="radio">
-          <input type="radio" value="card" v-model="paymentMethod" />
-          Debit / Credit Card
-        </label>
-
-        <label class="radio">
-          <input type="radio" value="transfer" v-model="paymentMethod" />
-          Bank Transfer
-        </label>
-      </section>
-
-      <!-- Card Fields -->
-      <section v-if="paymentMethod === 'card'" class="card-form">
-        <input placeholder="Card Number" />
-        <div class="two">
-          <input placeholder="MM / YY" />
-          <input placeholder="CVV" />
-        </div>
-        <input placeholder="Card Holder Name" />
-      </section>
-
-      <!-- Transfer Info -->
-      <section v-if="paymentMethod === 'transfer'" class="transfer">
-        <p>
-          Transfer the exact amount to:
-        </p>
-        <ul>
-          <li><strong>Bank:</strong> Zenith Bank</li>
-          <li><strong>Account Name:</strong> HomeCare Ltd</li>
-          <li><strong>Account Number:</strong> 1234567890</li>
-        </ul>
-        <small>Payment will be verified automatically.</small>
-      </section>
-
-      <p v-if="error" class="error">{{ error }}</p>
+      
 
       <button @click="pay" :disabled="loading">
         {{ loading ? 'Processing...' : 'Pay Now' }}
@@ -86,6 +50,9 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getAuth } from 'firebase/auth'
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/firebase"
+import { onMounted } from "vue"
 
 const router = useRouter()
 const route = useRoute()
@@ -99,10 +66,42 @@ const bookingId = route.query.bookingId
 const API = import.meta.env.VITE_API_BASE_URL
 
 const booking = ref({
-  service: 'Home Nursing Care',
-  provider: 'Nurse Grace',
-  date: '12 Aug 2026',
-  amount: 50
+  service: "",
+  provider: "Not matched",
+  date: "",
+  amount: 0
+})
+
+onMounted(async () => {
+  if (!bookingId) {
+    error.value = "Invalid booking reference"
+    return
+  }
+
+  try {
+    const bookingRef = doc(db, "bookings", bookingId)
+    const bookingSnap = await getDoc(bookingRef)
+
+    if (!bookingSnap.exists()) {
+      throw new Error("Booking not found")
+    }
+
+    const data = bookingSnap.data()
+
+    booking.value = {
+      service: data.serviceType,
+      provider: "Not matched",
+      date: new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+      }),
+      amount: data.price
+    }
+
+  } catch (e) {
+    error.value = e.message
+  }
 })
 
 async function pay() {

@@ -120,17 +120,21 @@
   </label>
 
   <label>
-    Expected Duration of Visit
-    <select v-model="form.duration" required>
-  <option value="">Select</option>
-  <option>1 Hour</option>
-  <option>2–3 Hours</option>
-  <option>Half Day</option>
-  <option>Full Day</option>
-  <option>Ongoing Care</option>
-</select>
+  Expected Duration of Visit
+  <select v-model="form.duration" required>
+    <option value="">Select</option>
+    <option>1 Hour</option>
+    <option>2–3 Hours</option>
+    <option>Half Day</option>
+    <option>Full Day</option>
+    <option>Ongoing Care</option>
+  </select>
 
-  </label>
+  <!-- 💰 LIVE PRICE -->
+  <p v-if="totalPrice" class="price-preview">
+    Total Price: ₦{{ totalPrice.toLocaleString() }}
+  </p>
+</label>
 </section>
 
 
@@ -279,7 +283,7 @@
 </template>
 
 <script setup>
-import { reactive } from "vue"
+import { reactive, computed } from "vue"
 import { auth, db } from "@/firebase"
 import { useRouter } from "vue-router"
 import { onMounted } from "vue"
@@ -330,7 +334,27 @@ onMounted(() => {
   })
 })
 
+const PRICE_MAP = {
+  physio: {
+    Massage: 2000
+  },
+  nursing: {
+    "Post Natal Care": 2500,
+    "Wound Care": 1500,
+    "Injection & Drip": 3000,
+    "Home Monitoring": 2200,
+    "Elderly Care": 1000
+  }
+}
 
+function durationToHours(duration) {
+  if (duration === "1 Hour") return 1
+  if (duration === "2–3 Hours") return 3
+  if (duration === "Half Day") return 6
+  if (duration === "Full Day") return 12
+  if (duration === "Ongoing Care") return 24
+  return 0
+}
 
 const form = reactive({
   clientName: "",
@@ -373,9 +397,20 @@ const form = reactive({
   emergencyPhone: "",
 
   consent: false,
-  paymentAgreement: false
+  paymentAgreement: false,
+   price: 0
 })
 
+const totalPrice = computed(() => {
+  if (!form.careCategory || !form.serviceType || !form.duration) return 0
+
+  const hourlyRate =
+    PRICE_MAP[form.careCategory]?.[form.serviceType] || 0
+
+  const hours = durationToHours(form.duration)
+
+  return hourlyRate * hours
+})
 
 watch(
   () => form.address,
@@ -403,6 +438,7 @@ async function submitForm() {
 
   try {
     const API = import.meta.env.VITE_API_BASE_URL
+    form.price = totalPrice.value
     const response = await fetch(`${API}/api/bookings`, {
   method: "POST",
   headers: {
@@ -577,6 +613,10 @@ textarea {
 .location-btn:hover {
   background: #dcfce7;
 }
-
+.price-preview {
+  margin-top: 6px;
+  font-weight: 700;
+  color: #166534;
+}
 
 </style>
