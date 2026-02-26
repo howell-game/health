@@ -18,6 +18,7 @@ import PaymentSuccess from '@/pages/PaymentSuccess.vue'
 import PaymentFailure from '@/pages/PaymentFailure.vue'
 import PaymentProcessing from '@/pages/PaymentProcessing.vue'
 import VerifyEmail from '@/pages/VerifyEmail.vue'
+import Withdraw from '@/pages/Withdraw.vue'
 
 const router = createRouter({
   // 🔑 Use hash mode for GitHub Pages
@@ -41,6 +42,7 @@ const router = createRouter({
     { path: '/book', name: 'BookingForm', component: BookingForm},
     { path: '/signup', name: 'Signup', component: Signup },
     { path: '/login', name: 'Login', component: Login },
+    {path: '/withdraw', name: 'Withdraw', component: Withdraw },
   ],
 })
 

@@ -160,7 +160,8 @@ import {
   serverTimestamp,
   onSnapshot,
   orderBy,
-  limit
+  limit,
+  increment,
 } from "firebase/firestore"
 import { db } from "@/firebase"
 
@@ -291,25 +292,51 @@ function closeModal() { showRating.value = false }
 async function submitReview() {
   if (!selectedBooking.value) return
   if (rating.value < 1 || rating.value > 5) return
+
   try {
     const bookingId = selectedBooking.value.id
-    const providerId = selectedBooking.value.providerId
 
-    await updateDoc(doc(db, "bookings", bookingId), {
+    // 1️⃣ Re-fetch booking from Firestore (DO NOT trust browser data)
+    const bookingRef = doc(db, "bookings", bookingId)
+    const bookingSnap = await getDoc(bookingRef)
+
+    if (!bookingSnap.exists()) {
+      throw new Error("Booking not found")
+    }
+
+    const bookingData = bookingSnap.data()
+    const providerId = bookingData.providerId
+    const price = bookingData.price
+
+    if (!providerId || !price) {
+      throw new Error("Missing providerId or price on booking")
+    }
+
+    // 2️⃣ Calculate provider payout (95%)
+    const payout = price * 0.95
+
+    // 3️⃣ Mark booking as completed + save review
+    await updateDoc(bookingRef, {
       rating: rating.value,
       review: reviewText.value.trim(),
       matchingStatus: "completed",
       completedAt: serverTimestamp()
     })
-    await updateDoc(doc(db, "providers", providerId), { activeBooking: false })
 
+    // 4️⃣ Pay provider (atomic increment)
+    await updateDoc(doc(db, "providers", providerId), {
+      balance: increment(payout),
+      activeBooking: false
+    })
+
+    // 5️⃣ Reset UI state
     selectedBooking.value.status = "Completed"
     selectedBooking.value.completed = true
-
     showRating.value = false
     rating.value = 0
     reviewText.value = ""
     selectedBooking.value = null
+
   } catch (error) {
     console.error("Submit review failed:", error)
   }

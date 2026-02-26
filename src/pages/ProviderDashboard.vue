@@ -13,6 +13,10 @@
   <span class="provider-status">
     {{ provider.status || "Not set" }}
   </span>
+
+  <span class="balance">
+    • Balance: ₦{{ provider.balance.toLocaleString() }}
+  </span>
 </div>
 
         </div>
@@ -185,7 +189,26 @@
           
         </div>
       </section>
+<!-- ===== WALLET / WITHDRAW ===== -->
+<section class="wallet-section">
+  <h2>Wallet</h2>
 
+  <div class="wallet-card">
+    <div class="wallet-info">
+      <span class="wallet-label">Available Balance</span>
+      <span class="wallet-amount">
+        ₦{{ provider.balance.toLocaleString() }}
+      </span>
+    </div>
+
+    <button
+  class="withdraw-btn"
+  @click="$router.push('/withdraw')"
+>
+  Withdraw
+</button>
+  </div>
+</section>
     </div>
   </div>
 </template>
@@ -232,7 +255,8 @@ function togglePast(id) {
 const provider = reactive({
   name: "",
   photo: null,
-  status: ""   // 🔑 comes from providers.status
+  status: "",
+  balance: 0
 })
 
 
@@ -257,6 +281,7 @@ if (providerSnap.exists()) {
   provider.name = data.name || "Provider"
   provider.photo = data.passportUrl || provider.photo
   provider.status = data.status || ""
+  provider.balance = data.balance || 0
 }
 
 
@@ -456,7 +481,9 @@ function nextPastPage() {
 function prevPastPage() {
   if (hasPrevPast.value) pastPage.value--
 }
-
+function withdrawFunds() {
+  alert("Withdrawal feature coming soon 💳")
+}
 
 </script>
 
@@ -763,6 +790,62 @@ h2 {
   margin-left: 6px;
   font-size: 0.85rem;
 }
+.balance {
+  margin-left: 10px;
+  font-weight: 600;
+  color: #166534;
+}
+/* ===== WALLET ===== */
+.wallet-section {
+  margin-top: 32px;
+}
 
+.wallet-card {
+  background: #f0fdf4;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
 
+.wallet-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.wallet-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.wallet-amount {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #166534;
+  margin-top: 4px;
+}
+
+.withdraw-btn {
+  padding: 12px 22px;
+  border-radius: 10px;
+  border: none;
+  background: #166534;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.withdraw-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.1);
+}
+
+.withdraw-btn:disabled {
+  background: #bbf7d0;
+  color: #6b7280;
+  cursor: not-allowed;
+}
 </style>
