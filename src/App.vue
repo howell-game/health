@@ -61,7 +61,6 @@
     <footer class="site-footer">
       <div class="footer-container">
         <p>© 2025 Home Healthcare. All rights reserved.</p>
-        <p>Email: info@homehealthcare.com | Phone: +123SS</p>
       </div>
     </footer>
   </div>
