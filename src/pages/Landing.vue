@@ -7,6 +7,7 @@
         <p>We connect families and individuals with licensed nurses and physiotherapists for safe, reliable home care services.</p>
         <div class="buttons">
           <router-link to="/book">
+          <img :src="emblem" alt="Healthcare at Home" />
   <button class="primary-btn">Book a Home Care Provider</button>
 </router-link>
 
@@ -15,7 +16,7 @@
 </router-link>
 </p>
         </div>
-        <img :src="emblem" alt="Healthcare at Home" />
+        
       </div>
     </section>
 
