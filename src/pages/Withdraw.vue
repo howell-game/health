@@ -372,7 +372,7 @@ input {
 }
 
 .btn.secondary {
-  background: #e5e7eb;
+  background: #4c75c5;
 }
 
 .btn:disabled {

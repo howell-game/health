@@ -15,7 +15,7 @@
 </router-link>
 </p>
         </div>
-        <img src="https://via.placeholder.com/600x400" alt="Healthcare at Home" />
+        <img :src="emblem" alt="Healthcare at Home" />
       </div>
     </section>
 
@@ -130,6 +130,10 @@
     
   </div>
 </template>
+
+<script setup>
+import emblem from "../assets/emblem.png"
+</script>
 
 <style>
 /* Global Styles */
@@ -297,6 +301,11 @@ body, html, #app {
   margin-bottom: 20px;
   color: black;
 }
+.hero img {
+  width: 600px;
+  max-width: 100%;
+}
+
 .cta v {
   font-size: 0.9rem;
   margin-bottom: 40px;

@@ -32,7 +32,7 @@ const router = createRouter({
     { path: '/verify-email', name: 'VerifyEmail', component: VerifyEmail , meta: { requiresAuth: true }},
     { path: '/payment', name: 'Payment', component: Payment },
     { path: '/contact', name: 'Contact', component: Contact, meta: { requiresAuth: true } },
-    { path: '/admin', name: 'AdminDashboard', component: AdminDashboard },
+    { path: '/admin8&', name: 'AdminDashboard', component: AdminDashboard },
     { path: '/manage', name: 'Manage', component: Manage , meta: { requiresAuth: true }},
     { path: '/dashboard', name: 'ClientDashboard', component: ClientDashboard, meta: { requiresAuth: true }},
     { path: '/providerdashboard', name: 'ProviderDashboard', component: ProviderDashboard, meta: { requiresAuth: true } },

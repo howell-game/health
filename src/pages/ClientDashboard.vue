@@ -313,7 +313,7 @@ async function submitReview() {
     }
 
     // 2️⃣ Calculate provider payout (95%)
-    const payout = price * 0.95
+    const payout = price * 0.70
 
     // 3️⃣ Mark booking as completed + save review
     await updateDoc(bookingRef, {
