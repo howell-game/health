@@ -336,14 +336,14 @@ onMounted(() => {
 
 const PRICE_MAP = {
   physio: {
-    Massage: 2000
+    Massage: 25000
   },
   nursing: {
-    "Post Natal Care": 2500,
-    "Wound Care": 1500,
-    "Injection & Drip": 3000,
-    "Home Monitoring": 2200,
-    "Elderly Care": 1000
+    "Post Natal Care": 10000,
+    "Wound Care": 10000,
+    "Injection & Drip": 10000,
+    "Home Monitoring": 20000,
+    "Elderly Care": 20000
   }
 }
 
