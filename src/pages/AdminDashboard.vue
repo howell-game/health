@@ -105,6 +105,35 @@
           </div>
         </div>
 
+<!-- Pending Bookings -->
+<div class="card">
+  <h2>Pending Bookings</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Client</th>
+        <th>Service</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr v-for="b in pendingBookings" :key="b.id">
+        <td>{{ b.clientName }}</td>
+        <td>{{ b.serviceType }}</td>
+        <td>{{ b.matchingStatus }}</td>
+      </tr>
+
+      <tr v-if="pendingBookings.length === 0">
+        <td colspan="3">No pending bookings</td>
+      </tr>
+    </tbody>
+  </table>
+
+</div>
+
+
         <div class="card">
   <h2>Recent Bookings</h2>
 
@@ -201,6 +230,7 @@ const db = getFirestore()
 
 const pendingProviders = ref([])
 const selectedProvider = ref(null)
+const pendingBookings = ref([])
 const showRejectModal = ref(false)
 const rejectReason = ref("")
 const totalUsers = ref(0)
@@ -240,6 +270,24 @@ async function loadActiveProviders() {
 
   const snap = await getDocs(q)
   activeProviders.value = snap.size
+}
+
+async function loadPendingBookings() {
+
+  const q = query(
+    collection(db, "bookings"),
+    where("paymentStatus", "==", "paid"),
+    where("matchingStatus", "==", "not_started"),
+    orderBy("createdAt", "desc"),
+    limit(5)
+  )
+
+  const snap = await getDocs(q)
+
+  pendingBookings.value = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }))
 }
 
 async function loadBookingsToday() {
@@ -328,6 +376,7 @@ onMounted(() => {
   loadBookingsToday()
   loadRevenue()
   loadRecentBookings()
+  loadPendingBookings()
 })
 
 function viewProvider(provider) {
