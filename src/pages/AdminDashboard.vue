@@ -30,19 +30,19 @@
       <section class="stats">
         <div class="stat-card">
           <h3>Total Users</h3>
-          <p>1,248</p>
+          <p>{{ totalUsers }}</p>
         </div>
         <div class="stat-card">
           <h3>Active Providers</h3>
-          <p>342</p>
+          <p>{{ activeProviders }}</p>
         </div>
         <div class="stat-card">
           <h3>Bookings Today</h3>
-          <p>87</p>
+          <p>{{ bookingsToday }}</p>
         </div>
         <div class="stat-card">
           <h3>Revenue</h3>
-          <p>₦1,230,000</p>
+          <p>₦{{ revenue.toLocaleString() }}</p>
         </div>
       </section>
 
@@ -105,31 +105,37 @@
           </div>
         </div>
 
-        <!-- Recent Bookings -->
         <div class="card">
-          <h2>Recent Bookings</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Client</th>
-                <th>Service</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>John</td>
-                <td>Wound Care</td>
-                <td class="confirmed">Confirmed</td>
-              </tr>
-              <tr>
-                <td>Aisha</td>
-                <td>Injection</td>
-                <td class="pending">Pending</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+  <h2>Recent Bookings</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Client</th>
+        <th>Service</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr v-for="b in recentBookings" :key="b.id">
+        <td>{{ b.clientName }}</td>
+        <td>{{ b.serviceType }}</td>
+        <td :class="b.matchingStatus">
+          {{ b.matchingStatus }}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Pagination Button -->
+  <div style="margin-top:15px;text-align:center">
+    <button @click="loadMoreBookings">
+      Load More
+    </button>
+  </div>
+
+</div>
 
         <!-- System Alerts -->
         <div class="card">
@@ -184,6 +190,7 @@ import {
   limit,
   getDocs,
   doc,
+  startAfter,
   updateDoc
 } from "firebase/firestore"
 import { getAuth } from "firebase/auth"
@@ -196,6 +203,13 @@ const pendingProviders = ref([])
 const selectedProvider = ref(null)
 const showRejectModal = ref(false)
 const rejectReason = ref("")
+const totalUsers = ref(0)
+const activeProviders = ref(0)
+const bookingsToday = ref(0)
+const revenue = ref(0)
+
+const recentBookings = ref([])
+const lastVisibleBooking = ref(null)
 const providerToReject = ref(null)
 async function loadPendingProviders() {
   const q = query(
@@ -213,7 +227,108 @@ async function loadPendingProviders() {
   }))
 }
 
-onMounted(loadPendingProviders)
+async function loadTotalUsers() {
+  const snap = await getDocs(collection(db, "users"))
+  totalUsers.value = snap.size
+}
+
+async function loadActiveProviders() {
+  const q = query(
+    collection(db, "providers"),
+    where("status", "==", "approved")
+  )
+
+  const snap = await getDocs(q)
+  activeProviders.value = snap.size
+}
+
+async function loadBookingsToday() {
+
+  const start = new Date()
+  start.setHours(0,0,0,0)
+
+  const end = new Date()
+  end.setHours(23,59,59,999)
+
+  const q = query(
+    collection(db, "bookings"),
+    where("createdAt", ">=", start),
+    where("createdAt", "<=", end)
+  )
+
+  const snap = await getDocs(q)
+
+  bookingsToday.value = snap.size
+}
+
+async function loadRevenue() {
+
+  const q = query(
+    collection(db, "bookings"),
+    where("paymentStatus", "==", "paid")
+  )
+
+  const snap = await getDocs(q)
+
+  let total = 0
+
+  snap.forEach(doc => {
+    const data = doc.data()
+    total += Number(data.price || 0)
+  })
+
+  revenue.value = total
+}
+
+async function loadRecentBookings() {
+
+  const q = query(
+    collection(db, "bookings"),
+    orderBy("createdAt", "desc"),
+    limit(3)
+  )
+
+  const snap = await getDocs(q)
+
+  recentBookings.value = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }))
+
+  lastVisibleBooking.value = snap.docs[snap.docs.length - 1]
+}
+
+async function loadMoreBookings() {
+
+  if (!lastVisibleBooking.value) return
+
+  const q = query(
+    collection(db, "bookings"),
+    orderBy("createdAt", "desc"),
+    startAfter(lastVisibleBooking.value),
+    limit(3)
+  )
+
+  const snap = await getDocs(q)
+
+  const newBookings = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }))
+
+  recentBookings.value.push(...newBookings)
+
+  lastVisibleBooking.value = snap.docs[snap.docs.length - 1]
+}
+
+onMounted(() => {
+  loadPendingProviders()
+  loadTotalUsers()
+  loadActiveProviders()
+  loadBookingsToday()
+  loadRevenue()
+  loadRecentBookings()
+})
 
 function viewProvider(provider) {
   selectedProvider.value = provider
