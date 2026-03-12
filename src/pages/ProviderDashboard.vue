@@ -13,6 +13,13 @@
   <span class="provider-status">
     {{ provider.status || "Not set" }}
   </span>
+  <router-link
+  v-if="isAdmin"
+  to="/admin8&"
+  class="admin-btn"
+>
+  Admin Dashboard
+</router-link>
 
   <span class="balance">
     • Balance: ₦{{ provider.balance.toLocaleString() }}
@@ -232,7 +239,7 @@ import { db } from "@/firebase"
 
 const router = useRouter()
 const auth = getAuth()
-
+const isAdmin = ref(false)
 const pastServices = ref([])
 const ratedBookings = computed(() => {
   return pastServices.value.filter(
@@ -282,6 +289,10 @@ if (providerSnap.exists()) {
   provider.photo = data.passportUrl || provider.photo
   provider.status = data.status || ""
   provider.balance = data.balance || 0
+  // ✅ check admin
+  if (data.admin === "yes") {
+    isAdmin.value = true
+  }
 }
 
 
@@ -836,6 +847,23 @@ h2 {
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+/* ===== ADMIN BUTTON ===== */
+.admin-btn {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  color: white;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.25s ease;
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.25);
+}
+
+.admin-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.35);
 }
 
 .withdraw-btn:hover:not(:disabled) {
