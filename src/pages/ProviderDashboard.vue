@@ -13,6 +13,7 @@
   <span class="provider-status">
     {{ provider.status || "Not set" }}
   </span>
+  <p>
   <router-link
   v-if="isAdmin"
   to="/admin8&"
@@ -20,6 +21,15 @@
 >
   Admin Dashboard
 </router-link>
+</p>
+<p>
+<router-link
+  to="/dashboard"
+  class="patient-btn"
+>
+  Client Dashboard
+</router-link>
+</p>
 
   <span class="balance">
     • Balance: ₦{{ provider.balance.toLocaleString() }}
@@ -875,5 +885,22 @@ h2 {
   background: #bbf7d0;
   color: #6b7280;
   cursor: not-allowed;
+}
+
+.patient-btn {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: white;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  text-decoration: none;
+  margin-left: 10px;
+  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.25);
+  transition: all 0.25s ease;
+}
+
+.patient-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(22, 163, 74, 0.35);
 }
 </style>

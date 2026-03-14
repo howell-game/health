@@ -24,7 +24,7 @@
         <button class="hamburger" @click="toggleMenu">☰</button>
 
         <nav :class="{ 'nav-links': true, open: menuOpen }">
-          <router-link to="/" class="nav-link" @click="closeMenu">Home</router-link>
+          
           <router-link to="/about" class="nav-link" @click="closeMenu">About</router-link>
           <router-link to="/policy" class="nav-link" @click="closeMenu">Policy</router-link>
 

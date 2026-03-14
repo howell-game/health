@@ -128,8 +128,8 @@
 
       <section>
         <h2>19. Contact Information</h2>
-        <p>Email: <a href="mailto:support@yourdomain.com">support@yourdomain.com</a></p>
-        <p>Address: [Company Address]</p>
+        <p>Call: <a>Healthcare Care Connect 08131608717</a></p>
+        <p>Address: [University of Benin Teaching Hospital]</p>
       </section>
     </div>
   </div>

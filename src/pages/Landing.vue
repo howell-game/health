@@ -6,9 +6,10 @@
         <h1>Professional Home Healthcare, Delivered with care</h1>
         <p>We connect families and individuals with licensed nurses and physiotherapists for safe, reliable home care services.</p>
         <div class="buttons">
-          <router-link to="/book">
-          <img :src="emblem" alt="Healthcare at Home" />
-  <button class="primary-btn">Book a Home Care Provider</button>
+        <img :src="emblem" alt="Healthcare at Home" />
+          <router-link to="/signup">
+          
+  <button class="primary-btn">Get Started</button>
 </router-link>
 
         <p> <router-link to="/providersignup">
@@ -122,7 +123,7 @@
         <h2>Book Your Home Visit Today</h2>
         <p>Get professional healthcare from the comfort of your home.</p>
         <v>Medical Disclaimer: We facilitate connections between clients and licensed healthcare providers. We do not replace hospitals, emergency services or medical diagnosis.</v>
-        <p><router-link to="/book">
+        <p><router-link to="/login">
   <button class="primary-btn">Book Now</button>
 </router-link></p>
       </div>

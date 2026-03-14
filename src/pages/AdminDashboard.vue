@@ -1,19 +1,38 @@
 <template>
   <div class="admin-layout">
     <!-- Sidebar -->
-    <aside class="sidebar">
-      <h2 class="logo">Admin Panel</h2>
-      <nav>
-        <a class="active">Dashboard</a>
-        <a>Users</a>
-        <a>Providers</a>
-        <a>Bookings</a>
-        <a>Payments</a>
-        <a>Reviews</a>
-        <a>Disputes</a>
-        <a>Settings</a>
-      </nav>
-    </aside>
+   <aside class="sidebar" ref="sidebarRef">
+  <h2 class="logo">Admin Panel</h2>
+
+  <nav>
+    <a class="active">Dashboard</a>
+    <a>Users</a>
+
+    <a @click.stop="toggleProviders">
+  Providers
+</a>
+
+    <a>Bookings</a>
+    <a>Payments</a>
+    <a>Reviews</a>
+    <a>Disputes</a>
+    <a>Settings</a>
+  </nav>
+
+  <!-- Providers Dropdown -->
+  <div v-if="showProviders" class="provider-dropdown">
+    <div
+      v-for="p in providers"
+      :key="p.id"
+      class="provider-item"
+      @click="openProviderModal(p)"
+    >
+      <span class="provider-name">{{ p.name }}</span>
+      <span class="provider-role">{{ p.role }}</span>
+    </div>
+  </div>
+
+</aside>
 
     <!-- Main Content -->
     <main class="main">
@@ -202,13 +221,53 @@
         Confirm Reject
       </button>
     </div>
+   
+  </div>
+  
+</div>
+ <!-- Provider Details Modal -->
+<div v-if="showProviderModal" class="modal-backdrop" @click.self="showProviderModal=false">
+  <div class="modal">
+
+    <h3>Provider Details</h3>
+
+    <img
+      :src="selectedProvider.passportUrl"
+      class="provider-passport"
+    />
+
+    <p><strong>Name:</strong> {{ selectedProvider.name }}</p>
+
+    <p><strong>Role:</strong> {{ selectedProvider.role }}</p>
+
+    <p><strong>Address:</strong> {{ selectedProvider.address }}</p>
+
+    <p><strong>Decline Count:</strong> {{ selectedProvider.declineCount || 0 }}</p>
+
+    <p><strong>Services:</strong></p>
+
+    <ul>
+      <li
+        v-for="s in selectedProvider.services"
+        :key="s"
+      >
+        {{ s }}
+      </li>
+    </ul>
+
+    <div class="modal-actions">
+      <button class="cancel" @click="showProviderModal = false">
+        Close
+      </button>
+    </div>
+
   </div>
 </div>
 
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted, onBeforeUnmount } from "vue"
 import { serverTimestamp } from "firebase/firestore"
 import {
   getFirestore,
@@ -225,8 +284,11 @@ import {
 import { getAuth } from "firebase/auth"
 const auth = getAuth()
 
-
+const sidebarRef = ref(null)
 const db = getFirestore()
+const providers = ref([])
+const showProviders = ref(false)
+const showProviderModal = ref(false)
 
 const pendingProviders = ref([])
 const selectedProvider = ref(null)
@@ -290,6 +352,28 @@ async function loadPendingBookings() {
   }))
 }
 
+async function toggleProviders() {
+
+  showProviders.value = !showProviders.value
+
+  if (providers.value.length > 0) return
+
+  const snap = await getDocs(collection(db, "providers"))
+
+  providers.value = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }))
+}
+
+function handleClickOutside(event) {
+  if (!sidebarRef.value) return
+
+  if (!sidebarRef.value.contains(event.target)) {
+    showProviders.value = false
+  }
+}
+
 async function loadBookingsToday() {
 
   const start = new Date()
@@ -307,6 +391,11 @@ async function loadBookingsToday() {
   const snap = await getDocs(q)
 
   bookingsToday.value = snap.size
+}
+
+function openProviderModal(provider) {
+  selectedProvider.value = provider
+  showProviderModal.value = true
 }
 
 async function loadRevenue() {
@@ -377,6 +466,11 @@ onMounted(() => {
   loadRevenue()
   loadRecentBookings()
   loadPendingBookings()
+  document.addEventListener("click", handleClickOutside)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", handleClickOutside)
 })
 
 function viewProvider(provider) {
@@ -583,6 +677,13 @@ button {
   color: #b91c1c;
 }
 
+.provider-passport {
+  width: 120px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  border: 1px solid #ddd;
+}
+
 /* Table */
 table {
   width: 100%;
@@ -761,5 +862,44 @@ thead {
   color: #374151;
 }
 
+.sidebar {
+  width: 240px;
+  background: #0f3d2e;
+  color: white;
+  padding: 24px;
+  position: relative; /* IMPORTANT */
+}
 
+/* Provider dropdown */
+.provider-dropdown {
+  position: absolute;
+  left: 0;
+  top: 120px; /* adjust if needed */
+  width: 100%;
+  max-height: 300px;
+  overflow-y: auto;
+  background: #0b2114;
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 10;
+}
+
+.provider-item {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  cursor: pointer;
+}
+
+.provider-item:hover {
+  background: #166534;
+}
+.modal {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 420px;
+  max-height: 80vh;   /* prevents cutoff */
+  overflow-y: auto;   /* scroll inside modal */
+}
 </style>
