@@ -120,14 +120,14 @@
   </label>
 
   <label>
-  Expected Duration of Visit
+  Expected Number of Visit
   <select v-model="form.duration" required>
     <option value="">Select</option>
-    <option>1 Hour</option>
-    <option>2–3 Hours</option>
-    <option>Half Day</option>
-    <option>Full Day</option>
-    <option>Ongoing Care</option>
+    <option>1 visit</option>
+    <option>3 visit</option>
+    <option>12 visit</option>
+    <option>24 visit</option>
+    <option>30 visit</option>
   </select>
 
   <!-- 💰 LIVE PRICE -->
@@ -154,13 +154,7 @@
     required
   />
 </label>
-<button
-  type="button"
-  class="location-btn"
-  @click="useCurrentLocation"
->
-  📍 Use my current location
-</button>
+
 
 
 
@@ -302,7 +296,8 @@ onMounted(() => {
 
 
   autocomplete = new google.maps.places.Autocomplete(input, {
-    fields: ["formatted_address", "geometry"]
+    fields: ["formatted_address", "geometry"],
+    componentRestrictions: { country: "ng" }
   })
 
   map = new google.maps.Map(document.getElementById("map"), {
@@ -348,11 +343,11 @@ const PRICE_MAP = {
 }
 
 function durationToHours(duration) {
-  if (duration === "1 Hour") return 1
-  if (duration === "2–3 Hours") return 3
-  if (duration === "Half Day") return 6
-  if (duration === "Full Day") return 12
-  if (duration === "Ongoing Care") return 24
+  if (duration === "1 visit") return 1
+  if (duration === "3 visit") return 3
+  if (duration === "12 visit") return 8
+  if (duration === "24 visit") return 16
+  if (duration === "30 visit") return 24
   return 0
 }
 
@@ -423,10 +418,10 @@ watch(
 )
 
 async function submitForm() {
-  if (!form.addressVerified) {
-    alert("Please select a valid address from the suggestions.");
-    return;
-  }
+  if (!form.lat || !form.lng) {
+  alert("Please select an address from the suggestions.");
+  return;
+}
 
   const user = auth.currentUser;
   if (!user) {
